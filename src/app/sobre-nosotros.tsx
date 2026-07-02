@@ -1,5 +1,6 @@
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 
 const OFFERINGS = [
@@ -25,96 +26,105 @@ export default function SobreNosotrosScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={styles.scrollOuter}
         showsVerticalScrollIndicator={false}>
 
-        {/* Nav */}
-        <View style={styles.nav}>
+        {/* Encabezado en degradado */}
+        <LinearGradient
+          colors={['#4EC920', '#1B5E20']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}>
+          <View pointerEvents="none" style={styles.headerBlob} />
+
+          <View style={styles.headerTopRow}>
+            <Pressable
+              style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
+              onPress={() => router.back()}>
+              <Text style={styles.backBtnText}>← Volver</Text>
+            </Pressable>
+
+            <View style={styles.logoWrap}>
+              <Image
+                source={require('../../assets/images/logo-glow.png')}
+                style={styles.navLogo}
+                resizeMode="contain"
+              />
+            </View>
+          </View>
+
+          <Text style={styles.title}>Sobre Nosotros</Text>
+          <Text style={styles.subtitle}>Conoce el equipo y la visión detrás de Balancea.</Text>
+        </LinearGradient>
+
+        <View style={styles.content}>
+
+          {/* Mision, como tarjeta flotante */}
+          <View style={styles.floatingCard}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardAccentBar} />
+              <Text style={styles.cardTitle}>Nuestra Misión</Text>
+            </View>
+            <Text style={styles.cardText}>
+              En Balancea creemos que el bienestar es un equilibrio entre la mente, el cuerpo
+              y los habitos cotidianos. Nuestra mision es proporcionar una herramienta accesible
+              y motivadora que acompane a las personas en su camino hacia una vida mas saludable.
+            </Text>
+          </View>
+
+          {/* Quienes somos */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardAccentBar} />
+              <Text style={styles.cardTitle}>Quienes Somos</Text>
+            </View>
+            <Text style={styles.cardText}>
+              Somos un equipo apasionado por la tecnologia y el bienestar humano. Combinamos
+              experiencia en desarrollo de software con conocimientos en salud y nutricion para
+              crear una aplicacion que realmente marque la diferencia en tu dia a dia.
+            </Text>
+          </View>
+
+          {/* Que ofrecemos */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardAccentBar} />
+              <Text style={styles.cardTitle}>Que Ofrecemos</Text>
+            </View>
+            <View style={styles.offeringsList}>
+              {OFFERINGS.map((o, i) => (
+                <View key={i} style={styles.offeringItem}>
+                  <View style={styles.offeringBullet}>
+                    <Text style={styles.offeringBulletText}>{i + 1}</Text>
+                  </View>
+                  <View style={styles.offeringContent}>
+                    <Text style={styles.offeringTitle}>{o.title}</Text>
+                    <Text style={styles.offeringDesc}>{o.desc}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Contacto */}
+          <View style={[styles.card, styles.contactCard]}>
+            <Text style={styles.contactLabel}>Contactanos</Text>
+            <Text style={styles.contactPrompt}>
+              Tienes preguntas, sugerencias o comentarios? Nos encantaria escucharte.
+            </Text>
+            <View style={styles.emailPill}>
+              <Text style={styles.emailText}>soporte@balancea.app</Text>
+            </View>
+          </View>
+
+          {/* CTA */}
           <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
-            onPress={() => router.back()}>
-            <Text style={styles.backBtnText}>← Volver</Text>
+            style={({ pressed }) => [styles.loginBtn, pressed && styles.pressed]}
+            onPress={() => router.push('/login')}>
+            <Text style={styles.loginBtnText}>Ir al Login</Text>
           </Pressable>
-          <Image
-            source={require('../../assets/images/logo-glow.png')}
-            style={styles.navLogo}
-            resizeMode="contain"
-          />
-        </View>
 
-        {/* Header */}
-        <View style={styles.headerSection}>
-          <Text style={styles.pageTitle}>Sobre{'\n'}Nosotros</Text>
-          <View style={styles.titleUnderline} />
-          <Text style={styles.pageSubtitle}>
-            Conoce el equipo y la vision detras de Balancea
-          </Text>
         </View>
-
-        {/* Mision */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardAccentBar} />
-            <Text style={styles.cardTitle}>Nuestra Mision</Text>
-          </View>
-          <Text style={styles.cardText}>
-            En Balancea creemos que el bienestar es un equilibrio entre la mente, el cuerpo
-            y los habitos cotidianos. Nuestra mision es proporcionar una herramienta accesible
-            y motivadora que acompane a las personas en su camino hacia una vida mas saludable.
-          </Text>
-        </View>
-
-        {/* Quienes somos */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardAccentBar} />
-            <Text style={styles.cardTitle}>Quienes Somos</Text>
-          </View>
-          <Text style={styles.cardText}>
-            Somos un equipo apasionado por la tecnologia y el bienestar humano. Combinamos
-            experiencia en desarrollo de software con conocimientos en salud y nutricion para
-            crear una aplicacion que realmente marque la diferencia en tu dia a dia.
-          </Text>
-        </View>
-
-        {/* Que ofrecemos */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardAccentBar} />
-            <Text style={styles.cardTitle}>Que Ofrecemos</Text>
-          </View>
-          <View style={styles.offeringsList}>
-            {OFFERINGS.map((o, i) => (
-              <View key={i} style={styles.offeringItem}>
-                <View style={styles.offeringBullet}>
-                  <Text style={styles.offeringBulletText}>{i + 1}</Text>
-                </View>
-                <View style={styles.offeringContent}>
-                  <Text style={styles.offeringTitle}>{o.title}</Text>
-                  <Text style={styles.offeringDesc}>{o.desc}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Contacto */}
-        <View style={[styles.card, styles.contactCard]}>
-          <Text style={styles.contactLabel}>Contactanos</Text>
-          <Text style={styles.contactPrompt}>
-            Tienes preguntas, sugerencias o comentarios? Nos encantaria escucharte.
-          </Text>
-          <View style={styles.emailPill}>
-            <Text style={styles.emailText}>soporte@balancea.app</Text>
-          </View>
-        </View>
-
-        {/* CTA */}
-        <Pressable
-          style={({ pressed }) => [styles.loginBtn, pressed && styles.pressed]}
-          onPress={() => router.push('/login')}>
-          <Text style={styles.loginBtnText}>Ir al Login</Text>
-        </Pressable>
 
       </ScrollView>
     </SafeAreaView>
@@ -126,68 +136,97 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
-  scroll: {
+  scrollOuter: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 16,
     paddingBottom: 40,
-    gap: 16,
     backgroundColor: '#ffffff',
   },
 
-  /* Nav */
-  nav: {
+  /* Encabezado */
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 56,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
+  },
+  headerBlob: {
+    position: 'absolute',
+    top: -50,
+    right: -60,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  headerTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    alignItems: 'center',
+    marginBottom: 18,
   },
   backBtn: {
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderRadius: 16,
     paddingVertical: 6,
-    paddingHorizontal: 2,
+    paddingHorizontal: 12,
   },
   backBtnText: {
-    color: '#4EC920',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  navLogo: {
-    width: 36,
-    height: 36,
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   pressed: {
     opacity: 0.75,
   },
-
-  /* Header */
-  headerSection: {
-    marginBottom: 4,
+  logoWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  pageTitle: {
-    fontSize: 38,
+  navLogo: {
+    width: 26,
+    height: 26,
+  },
+  title: {
+    color: '#ffffff',
+    fontSize: 28,
     fontWeight: '800',
-    color: '#1a2e1a',
     letterSpacing: -0.5,
-    lineHeight: 44,
   },
-  titleUnderline: {
-    width: 48,
-    height: 4,
-    backgroundColor: '#4EC920',
-    borderRadius: 2,
-    marginTop: 8,
-    marginBottom: 12,
+  subtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    marginTop: 6,
+    fontWeight: '500',
   },
-  pageSubtitle: {
-    fontSize: 14,
-    color: '#888',
-    lineHeight: 21,
+
+  /* Contenido */
+  content: {
+    paddingHorizontal: 20,
+    gap: 14,
+  },
+  floatingCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 20,
+    gap: 12,
+    marginTop: -40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
   },
 
   /* Card */
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 20,
     gap: 12,
     borderWidth: 1,
@@ -206,7 +245,7 @@ const styles = StyleSheet.create({
   cardAccentBar: {
     width: 4,
     height: 20,
-    backgroundColor: '#4EC920',
+    backgroundColor: '#2E7D32',
     borderRadius: 2,
   },
   cardTitle: {
@@ -269,7 +308,7 @@ const styles = StyleSheet.create({
   contactLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#4EC920',
+    color: '#2E7D32',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -295,12 +334,12 @@ const styles = StyleSheet.create({
 
   /* Login CTA */
   loginBtn: {
-    backgroundColor: '#4EC920',
+    backgroundColor: '#2E7D32',
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 4,
-    shadowColor: '#4EC920',
+    shadowColor: '#2E7D32',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.28,
     shadowRadius: 10,

@@ -1,9 +1,13 @@
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
+import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 const COLORS = {
   primaryGreen: '#2E7D32',
+  deepGreen: '#1B5E20',
   lightGreen: '#66BB6A',
   softGreen: '#A5D6A7',
   white: '#FFFFFF',
@@ -39,7 +43,7 @@ function WellnessIcon() {
   );
 }
 
-const CARDS = [
+const FEATURES = [
   {
     key: 'nutricion',
     title: 'Nutrición Inteligente',
@@ -61,141 +65,210 @@ const CARDS = [
 ];
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.root}>
+      <StatusBar style="light" />
+
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 28 }]}
         showsVerticalScrollIndicator={false}>
 
-        {/* Encabezado */}
-        <View style={styles.header}>
-          <View style={styles.logoWrap}>
+        {/* Hero: primer elemento del scroll, así la tarjeta flotante puede
+            superponerse a su borde inferior sin quedar recortada por el
+            contenedor de scroll (pasaba cuando el hero vivía fuera del ScrollView). */}
+        <LinearGradient
+          colors={[COLORS.primaryGreen, COLORS.deepGreen]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.hero, { paddingTop: insets.top + 22 }]}>
+
+          <View pointerEvents="none" style={styles.heroBlobLarge} />
+          <View pointerEvents="none" style={styles.heroBlobSmall} />
+
+          <Animated.View entering={FadeIn.duration(500)} style={styles.eyebrowPill}>
+            <Text style={styles.eyebrowText}>SALUD · NUTRICIÓN · BIENESTAR</Text>
+          </Animated.View>
+
+          <Animated.View entering={FadeInDown.duration(600).delay(80)} style={styles.logoWrap}>
             <Image
               source={require('../../assets/images/logo-glow.png')}
               style={styles.logo}
               resizeMode="contain"
             />
-          </View>
-          <Text style={styles.brand}>Balancea</Text>
-          <Text style={styles.tagline}>
+          </Animated.View>
+
+          <Animated.Text entering={FadeInDown.duration(600).delay(160)} style={styles.brand}>
+            Balancea
+          </Animated.Text>
+          <Animated.Text entering={FadeInDown.duration(600).delay(220)} style={styles.tagline}>
             Tu bienestar comienza con una mejor alimentación.
-          </Text>
-        </View>
+          </Animated.Text>
+        </LinearGradient>
 
-        {/* Tarjetas informativas */}
-        <View style={styles.cardsWrap}>
-          {CARDS.map(({ key, title, description, Icon }) => (
-            <View key={key} style={styles.card}>
-              <View style={styles.cardIconBadge}>
-                <Icon />
+        <View style={styles.content}>
+          {/* Tarjeta flotante de beneficios */}
+          <Animated.View entering={FadeInUp.duration(600).delay(260)} style={styles.floatingCard}>
+            {FEATURES.map(({ key, title, description, Icon }, index) => (
+              <View
+                key={key}
+                style={[styles.featureRow, index < FEATURES.length - 1 && styles.featureRowDivider]}>
+                <View style={styles.cardIconBadge}>
+                  <Icon />
+                </View>
+                <View style={styles.cardTextWrap}>
+                  <Text style={styles.cardTitle}>{title}</Text>
+                  <Text style={styles.cardDescription}>{description}</Text>
+                </View>
               </View>
-              <View style={styles.cardTextWrap}>
-                <Text style={styles.cardTitle}>{title}</Text>
-                <Text style={styles.cardDescription}>{description}</Text>
-              </View>
-            </View>
-          ))}
+            ))}
+          </Animated.View>
+
+          {/* Botones */}
+          <Animated.View entering={FadeInUp.duration(600).delay(360)} style={styles.ctaSection}>
+            <Pressable
+              style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
+              onPress={() => router.push('/login')}>
+              <Text style={styles.primaryBtnText}>Comenzar</Text>
+              <Text style={styles.primaryBtnArrow}>→</Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
+              onPress={() => router.push('/sobre-nosotros')}>
+              <Text style={styles.secondaryBtnText}>Conocer más</Text>
+            </Pressable>
+          </Animated.View>
+
+          {/* Footer */}
+          <Animated.View entering={FadeIn.duration(500).delay(460)} style={styles.footerWrap}>
+            <View style={styles.footerDivider} />
+            <Text style={styles.footerText}>Balancea © 2026</Text>
+          </Animated.View>
         </View>
-
-        {/* Botones */}
-        <View style={styles.ctaSection}>
-          <Pressable
-            style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
-            onPress={() => router.push('/login')}>
-            <Text style={styles.primaryBtnText}>Comenzar</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
-            onPress={() => router.push('/sobre-nosotros')}>
-            <Text style={styles.secondaryBtnText}>Conocer más</Text>
-          </Pressable>
-        </View>
-
-        {/* Footer */}
-        <Text style={styles.footerText}>Balancea © 2026</Text>
 
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  root: {
     flex: 1,
     backgroundColor: COLORS.white,
   },
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 36,
-    paddingBottom: 32,
-    backgroundColor: COLORS.white,
-  },
 
-  /* Encabezado */
-  header: {
+  /* Hero */
+  hero: {
     alignItems: 'center',
-    marginBottom: 32,
+    paddingHorizontal: 28,
+    paddingBottom: 76,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+    overflow: 'hidden',
+  },
+  heroBlobLarge: {
+    position: 'absolute',
+    top: -60,
+    right: -70,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  heroBlobSmall: {
+    position: 'absolute',
+    bottom: 20,
+    left: -50,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  eyebrowPill: {
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    marginBottom: 18,
+  },
+  eyebrowText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   logoWrap: {
-    width: 96,
-    height: 96,
-    borderRadius: 26,
-    backgroundColor: COLORS.lightGray,
+    width: 88,
+    height: 88,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 18,
-    shadowColor: COLORS.primaryGreen,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 6,
   },
   logo: {
-    width: 58,
-    height: 58,
+    width: 54,
+    height: 54,
   },
   brand: {
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: '800',
-    color: COLORS.primaryGreen,
+    color: COLORS.white,
     letterSpacing: -0.5,
     marginBottom: 8,
   },
   tagline: {
     fontSize: 15,
-    color: COLORS.textMuted,
+    color: 'rgba(255,255,255,0.85)',
     fontWeight: '500',
     textAlign: 'center',
     lineHeight: 21,
     paddingHorizontal: 12,
   },
 
-  /* Tarjetas */
-  cardsWrap: {
-    gap: 14,
-    marginBottom: 32,
+  /* Contenido */
+  scroll: {
+    flexGrow: 1,
   },
-  card: {
+  content: {
+    paddingHorizontal: 24,
+  },
+
+  /* Tarjeta flotante */
+  floatingCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 4,
+    marginTop: -48,
+    marginBottom: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#EDEDED',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+    paddingVertical: 18,
+  },
+  featureRowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   cardIconBadge: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 15,
     backgroundColor: COLORS.primaryGreen,
     alignItems: 'center',
     justifyContent: 'center',
@@ -205,10 +278,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: COLORS.textDark,
-    marginBottom: 4,
+    marginBottom: 3,
   },
   cardDescription: {
     fontSize: 13,
@@ -218,18 +291,18 @@ const styles = StyleSheet.create({
 
   /* Iconos */
   iconPlate: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     borderWidth: 2.5,
     borderColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconPlateInner: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: COLORS.white,
   },
   iconBars: {
@@ -244,13 +317,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   iconCrossWrap: {
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
   },
   iconCrossV: {
     position: 'absolute',
-    left: 9,
-    top: 1,
+    left: 8,
+    top: 0,
     width: 6,
     height: 22,
     borderRadius: 3,
@@ -258,8 +331,8 @@ const styles = StyleSheet.create({
   },
   iconCrossH: {
     position: 'absolute',
-    left: 1,
-    top: 9,
+    left: 0,
+    top: 8,
     width: 22,
     height: 6,
     borderRadius: 3,
@@ -269,17 +342,20 @@ const styles = StyleSheet.create({
   /* Botones */
   ctaSection: {
     gap: 12,
-    marginBottom: 28,
+    marginBottom: 24,
   },
   primaryBtn: {
+    flexDirection: 'row',
     backgroundColor: COLORS.primaryGreen,
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     shadowColor: COLORS.primaryGreen,
-    shadowOffset: { width: 0, height: 5 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
-    shadowRadius: 10,
+    shadowRadius: 12,
     elevation: 5,
   },
   primaryBtnText: {
@@ -287,6 +363,11 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: 0.4,
+  },
+  primaryBtnArrow: {
+    color: COLORS.white,
+    fontSize: 17,
+    fontWeight: '700',
   },
   secondaryBtn: {
     borderRadius: 16,
@@ -306,6 +387,16 @@ const styles = StyleSheet.create({
   },
 
   /* Footer */
+  footerWrap: {
+    alignItems: 'center',
+    gap: 14,
+  },
+  footerDivider: {
+    width: 40,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: COLORS.softGreen,
+  },
   footerText: {
     fontSize: 12,
     color: COLORS.textMuted,

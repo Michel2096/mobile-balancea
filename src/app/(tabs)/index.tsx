@@ -10,22 +10,34 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { getUser, clearToken, clearUser, dashboardApi, DashboardSummary, ActivityItem } from '@/services/api';
+import { getCartCount, useCart } from '@/services/cart';
 
 type MenuItem = {
   key: string;
   label: string;
-  route: '/(tabs)' | '/productos' | '/sobre-nosotros' | '/dietas' | '/configuracion';
+  route: '/(tabs)' | '/productos' | '/sobre-nosotros' | '/dietas' | '/configuracion' | '/carrito';
 };
 
 const MENU_ITEMS: MenuItem[] = [
   { key: 'inicio', label: 'Inicio', route: '/(tabs)' },
   { key: 'productos', label: 'Productos', route: '/productos' },
+  { key: 'carrito', label: 'Carrito', route: '/carrito' },
   { key: 'nosotros', label: 'Nosotros', route: '/sobre-nosotros' },
   { key: 'dietas', label: 'Dietas', route: '/dietas' },
   { key: 'configuracion', label: 'Configuración', route: '/configuracion' },
 ];
+
+function BasketIcon() {
+  return (
+    <View style={styles.basketIconWrap}>
+      <View style={styles.basketIconBody} />
+      <View style={styles.basketIconHandle} />
+    </View>
+  );
+}
 
 function greeting() {
   const h = new Date().getHours();
@@ -78,6 +90,8 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
+  const cartItems = useCart();
+  const cartCount = getCartCount(cartItems);
 
   function handleLogout() {
     clearToken();
@@ -126,7 +140,7 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={styles.scrollOuter}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -137,31 +151,47 @@ export default function DashboardScreen() {
           />
         }>
 
-        {/* Header */}
-        <View style={styles.header}>
-          <Pressable
-            onPress={() => setMenuVisible(true)}
-            style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}
-            hitSlop={10}>
-            <Text style={styles.menuButtonIcon}>☰</Text>
-          </Pressable>
+        {/* Encabezado en degradado */}
+        <LinearGradient
+          colors={['#4EC920', '#1B5E20']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}>
+          <View pointerEvents="none" style={styles.headerBlob} />
 
-          <View style={styles.headerLeft}>
-            <Text style={styles.greetingText}>{greeting()},</Text>
-            <Text style={styles.nameText}>{firstName}</Text>
-            <Text style={styles.dateText}>{formatDate()}</Text>
-          </View>
+          <View style={styles.headerTopRow}>
+            <Pressable
+              onPress={() => setMenuVisible(true)}
+              style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}
+              hitSlop={10}>
+              <Text style={styles.menuButtonIcon}>☰</Text>
+            </Pressable>
 
-          <View style={styles.headerRight}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarLetter}>
-                {(user?.nombre ?? 'U')[0].toUpperCase()}
-              </Text>
+            <View style={styles.headerRightRow}>
+              <Pressable
+                onPress={() => router.push('/carrito')}
+                style={({ pressed }) => [styles.cartButton, pressed && styles.pressed]}
+                hitSlop={10}>
+                <BasketIcon />
+                {cartCount > 0 && (
+                  <View style={styles.cartBadge}>
+                    <Text style={styles.cartBadgeText}>{cartCount > 9 ? '9+' : cartCount}</Text>
+                  </View>
+                )}
+              </Pressable>
+
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarLetter}>
+                  {(user?.nombre ?? 'U')[0].toUpperCase()}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        <View style={styles.greenDivider} />
+          <Text style={styles.greetingText}>{greeting()},</Text>
+          <Text style={styles.nameText}>{firstName}</Text>
+          <Text style={styles.dateText}>{formatDate()}</Text>
+        </LinearGradient>
 
         <Modal
           visible={menuVisible}
@@ -170,125 +200,134 @@ export default function DashboardScreen() {
           onRequestClose={() => setMenuVisible(false)}>
           <Pressable style={styles.menuOverlay} onPress={() => setMenuVisible(false)} />
           <SafeAreaView style={styles.menuPanel} edges={['top', 'left', 'bottom']}>
-            <View style={styles.menuUserRow}>
+            <LinearGradient
+              colors={['#4EC920', '#1B5E20']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.menuHeader}>
+              <View pointerEvents="none" style={styles.menuHeaderBlob} />
               <View style={styles.menuAvatarCircle}>
                 <Text style={styles.menuAvatarLetter}>
                   {(user?.nombre ?? 'U')[0].toUpperCase()}
                 </Text>
               </View>
-              <View style={styles.menuUserInfo}>
-                <Text style={styles.menuUserName}>{user?.nombre ?? 'Usuario'}</Text>
-                <Text style={styles.menuUserEmail}>{user?.correo ?? ''}</Text>
-              </View>
-            </View>
+              <Text style={styles.menuUserName} numberOfLines={1}>{user?.nombre ?? 'Usuario'}</Text>
+              <Text style={styles.menuUserEmail} numberOfLines={1}>{user?.correo ?? ''}</Text>
+            </LinearGradient>
 
-            <View style={styles.menuDivider} />
+            <ScrollView style={styles.menuBody} showsVerticalScrollIndicator={false}>
+              {MENU_ITEMS.map((item) => (
+                <Pressable
+                  key={item.key}
+                  style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+                  onPress={() => handleSelectMenuItem(item)}>
+                  <View style={styles.menuItemDot} />
+                  <Text style={styles.menuItemText}>{item.label}</Text>
+                  <Text style={styles.menuItemChevron}>›</Text>
+                </Pressable>
+              ))}
 
-            {MENU_ITEMS.map((item) => (
               <Pressable
-                key={item.key}
-                style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
-                onPress={() => handleSelectMenuItem(item)}>
-                <Text style={styles.menuItemText}>{item.label}</Text>
+                style={({ pressed }) => [styles.menuLogoutItem, pressed && styles.menuLogoutItemPressed]}
+                onPress={() => {
+                  setMenuVisible(false);
+                  handleLogout();
+                }}>
+                <Text style={styles.menuLogoutText}>Cerrar sesión</Text>
               </Pressable>
-            ))}
-
-            <Pressable
-              style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
-              onPress={() => {
-                setMenuVisible(false);
-                handleLogout();
-              }}>
-              <Text style={styles.menuLogoutText}>Cerrar sesión</Text>
-            </Pressable>
+            </ScrollView>
           </SafeAreaView>
         </Modal>
 
-        {loading && !refreshing ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#4EC920" />
-            <Text style={styles.loadingText}>Cargando tu resumen...</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorTitle}>No se pudo cargar</Text>
-            <Text style={styles.errorText}>{error}</Text>
-            <Pressable onPress={() => fetchData()} style={styles.retryBtn}>
-              <Text style={styles.retryText}>Reintentar</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <>
-            {/* Stat cards */}
-            <Text style={styles.sectionTitle}>Resumen de hoy</Text>
-            <View style={styles.statsGrid}>
-              <StatCard
-                label="Balance"
-                value={String(summary?.balance_score ?? '0')}
-                unit="pts"
-                accent
-              />
-              <StatCard
-                label="Actividades"
-                value={String(summary?.actividades_completadas ?? '0')}
-                unit="hoy"
-              />
-              <StatCard
-                label="Racha"
-                value={String(summary?.racha_dias ?? '0')}
-                unit="dias"
-              />
-              <StatCard
-                label="Meta semanal"
-                value={`${summary?.meta_semanal_pct ?? '0'}%`}
-              />
+        <View style={styles.content}>
+          {loading && !refreshing ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color="#4EC920" />
+              <Text style={styles.loadingText}>Cargando tu resumen...</Text>
             </View>
-
-            {/* Progress bar */}
-            <Text style={styles.sectionTitle}>Progreso semanal</Text>
-            <View style={styles.card}>
-              <View style={styles.progressHeader}>
-                <Text style={styles.progressLabel}>Completado esta semana</Text>
-                <Text style={styles.progressPct}>{pct}%</Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${Math.min(pct, 100)}%` }]} />
-              </View>
-              <Text style={styles.progressSub}>
-                {pct >= 100
-                  ? 'Meta alcanzada. Excelente semana.'
-                  : pct >= 50
-                  ? 'Vas muy bien, sigue asi.'
-                  : 'Aun hay tiempo para alcanzar tu meta.'}
-              </Text>
+          ) : error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorTitle}>No se pudo cargar</Text>
+              <Text style={styles.errorText}>{error}</Text>
+              <Pressable onPress={() => fetchData()} style={styles.retryBtn}>
+                <Text style={styles.retryText}>Reintentar</Text>
+              </Pressable>
             </View>
+          ) : (
+            <>
+              {/* Stat cards flotantes */}
+              <View style={styles.floatingCard}>
+                <Text style={styles.floatingCardTitle}>Resumen de hoy</Text>
+                <View style={styles.statsGrid}>
+                  <StatCard
+                    label="Balance"
+                    value={String(summary?.balance_score ?? '0')}
+                    unit="pts"
+                    accent
+                  />
+                  <StatCard
+                    label="Actividades"
+                    value={String(summary?.actividades_completadas ?? '0')}
+                    unit="hoy"
+                  />
+                  <StatCard
+                    label="Racha"
+                    value={String(summary?.racha_dias ?? '0')}
+                    unit="dias"
+                  />
+                  <StatCard
+                    label="Meta semanal"
+                    value={`${summary?.meta_semanal_pct ?? '0'}%`}
+                  />
+                </View>
+              </View>
 
-            {/* Recent activity */}
-            <Text style={styles.sectionTitle}>Actividad reciente</Text>
-            <View style={styles.card}>
-              {activity.length === 0 ? (
-                <Text style={styles.emptyText}>Sin actividad registrada aun.</Text>
-              ) : (
-                activity.map((item, idx) => (
-                  <View
-                    key={item.id}
-                    style={[styles.activityRow, idx < activity.length - 1 && styles.activityDivider]}>
-                    <View style={[styles.dot, item.completada && styles.dotDone]} />
-                    <View style={styles.activityInfo}>
-                      <Text style={styles.activityTitle}>{item.titulo}</Text>
-                      <Text style={styles.activityTime}>{formatRelative(item.fecha)}</Text>
-                    </View>
-                    {item.completada && (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText}>✓</Text>
+              {/* Progress bar */}
+              <Text style={styles.sectionTitle}>Progreso semanal</Text>
+              <View style={styles.card}>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressLabel}>Completado esta semana</Text>
+                  <Text style={styles.progressPct}>{pct}%</Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${Math.min(pct, 100)}%` }]} />
+                </View>
+                <Text style={styles.progressSub}>
+                  {pct >= 100
+                    ? 'Meta alcanzada. Excelente semana.'
+                    : pct >= 50
+                    ? 'Vas muy bien, sigue asi.'
+                    : 'Aun hay tiempo para alcanzar tu meta.'}
+                </Text>
+              </View>
+
+              {/* Recent activity */}
+              <Text style={styles.sectionTitle}>Actividad reciente</Text>
+              <View style={styles.card}>
+                {activity.length === 0 ? (
+                  <Text style={styles.emptyText}>Sin actividad registrada aun.</Text>
+                ) : (
+                  activity.map((item, idx) => (
+                    <View
+                      key={item.id}
+                      style={[styles.activityRow, idx < activity.length - 1 && styles.activityDivider]}>
+                      <View style={[styles.dot, item.completada && styles.dotDone]} />
+                      <View style={styles.activityInfo}>
+                        <Text style={styles.activityTitle}>{item.titulo}</Text>
+                        <Text style={styles.activityTime}>{formatRelative(item.fecha)}</Text>
                       </View>
-                    )}
-                  </View>
-                ))
-              )}
-            </View>
-          </>
-        )}
+                      {item.completada && (
+                        <View style={styles.badge}>
+                          <Text style={styles.badgeText}>✓</Text>
+                        </View>
+                      )}
+                    </View>
+                  ))
+                )}
+              </View>
+            </>
+          )}
+        </View>
 
       </ScrollView>
     </SafeAreaView>
@@ -300,86 +339,165 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
-  scroll: {
+  scrollOuter: {
     flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 48,
-    gap: 12,
+    paddingBottom: 40,
     backgroundColor: '#ffffff',
   },
 
-  /* Header */
+  /* Header en degradado */
   header: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 56,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
+  },
+  headerBlob: {
+    position: 'absolute',
+    top: -50,
+    right: -60,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 4,
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  headerRight: {
     alignItems: 'center',
-    gap: 6,
+    marginBottom: 18,
   },
   menuButton: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
-    marginTop: 2,
   },
   menuButtonIcon: {
-    color: '#1a2e1a',
-    fontSize: 24,
+    color: '#ffffff',
+    fontSize: 22,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.75,
+  },
+  headerRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  cartButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: '#e05050',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#1B5E20',
+  },
+  cartBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  basketIconWrap: {
+    width: 26,
+    height: 24,
+    alignItems: 'center',
+  },
+  basketIconBody: {
+    width: 24,
+    height: 17,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    marginTop: 7,
+  },
+  basketIconHandle: {
+    position: 'absolute',
+    top: 0,
+    width: 14,
+    height: 10,
+    borderWidth: 2.5,
+    borderColor: 'rgba(255,255,255,0.95)',
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
   },
   greetingText: {
-    color: '#555',
+    color: 'rgba(255,255,255,0.85)',
     fontSize: 15,
     fontWeight: '500',
   },
   nameText: {
-    color: '#1a2e1a',
-    fontSize: 26,
+    color: '#ffffff',
+    fontSize: 28,
     fontWeight: '800',
     marginTop: 2,
+    letterSpacing: -0.5,
   },
   dateText: {
-    color: '#888',
+    color: 'rgba(255,255,255,0.75)',
     fontSize: 12,
-    marginTop: 3,
+    marginTop: 4,
     textTransform: 'capitalize',
   },
   avatarCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#4EC920',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
-    shadowColor: '#4EC920',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.2,
     shadowRadius: 6,
-    elevation: 5,
+    elevation: 4,
   },
   avatarLetter: {
-    color: '#ffffff',
-    fontSize: 20,
+    color: '#2E7D32',
+    fontSize: 18,
     fontWeight: '800',
   },
-  greenDivider: {
-    height: 3,
-    backgroundColor: '#4EC920',
-    borderRadius: 2,
-    marginBottom: 8,
+
+  /* Contenido */
+  content: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  floatingCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 22,
+    padding: 18,
+    gap: 12,
+    marginTop: -40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  floatingCardTitle: {
+    color: '#1a2e1a',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
 
   /* Hamburger menu */
@@ -392,56 +510,64 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    width: '75%',
+    width: '80%',
     maxWidth: 320,
     backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingTop: 24,
     shadowColor: '#000',
     shadowOffset: { width: 2, height: 0 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 8,
   },
-  menuUserRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  menuHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 22,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
+  },
+  menuHeaderBlob: {
+    position: 'absolute',
+    top: -40,
+    right: -40,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   menuAvatarCircle: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#4EC920',
+    backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 12,
   },
   menuAvatarLetter: {
-    color: '#ffffff',
+    color: '#2E7D32',
     fontSize: 22,
     fontWeight: '800',
   },
-  menuUserInfo: {
-    flex: 1,
-  },
   menuUserName: {
-    color: '#1a2e1a',
+    color: '#ffffff',
     fontSize: 17,
     fontWeight: '800',
   },
   menuUserEmail: {
-    color: '#888',
+    color: 'rgba(255,255,255,0.8)',
     fontSize: 12,
     marginTop: 2,
   },
-  menuDivider: {
-    height: 3,
-    backgroundColor: '#4EC920',
-    borderRadius: 2,
-    marginTop: 16,
-    marginBottom: 8,
+  menuBody: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 16,
   },
   menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
@@ -449,10 +575,33 @@ const styles = StyleSheet.create({
   menuItemPressed: {
     backgroundColor: '#f7fbf3',
   },
+  menuItemDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#4EC920',
+  },
   menuItemText: {
+    flex: 1,
     color: '#1a2e1a',
     fontSize: 15,
     fontWeight: '600',
+  },
+  menuItemChevron: {
+    color: '#c4c4c4',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  menuLogoutItem: {
+    marginTop: 18,
+    marginBottom: 20,
+    backgroundColor: '#fdeaea',
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  menuLogoutItemPressed: {
+    opacity: 0.75,
   },
   menuLogoutText: {
     color: '#e05050',

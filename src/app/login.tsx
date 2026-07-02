@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import {
   Alert,
-  Image,
-  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { auth, setToken, setUser } from '@/services/api';
 
@@ -22,27 +21,29 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   return (
-    <ImageBackground
-      source={require('../../assets/Fondo.png')}
-      style={styles.background}
-      resizeMode="cover">
-      <View style={styles.overlay} />
-      <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.kav}>
-          <ScrollView
-            contentContainerStyle={styles.scroll}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.kav}>
+        <ScrollView
+          contentContainerStyle={styles.scrollOuter}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
 
-            <Image
-              source={require('../../assets/images/logo-glow.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+          {/* Encabezado en degradado */}
+          <LinearGradient
+            colors={['#4EC920', '#1B5E20']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.header}>
+            <View pointerEvents="none" style={styles.headerBlob} />
 
-            <View style={styles.card}>
+            <Text style={styles.title}>Balancea</Text>
+            <Text style={styles.subtitle}>Inicia sesión para continuar tu bienestar.</Text>
+          </LinearGradient>
+
+          <View style={styles.content}>
+            <View style={styles.floatingCard}>
               <Text style={styles.cardTitle}>Iniciar Sesión</Text>
               <View style={styles.divider} />
 
@@ -51,7 +52,7 @@ export default function LoginScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="correo@example.com"
-                  placeholderTextColor="#8aab7a"
+                  placeholderTextColor="#b0c8a0"
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -65,7 +66,7 @@ export default function LoginScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="••••••••"
-                  placeholderTextColor="#8aab7a"
+                  placeholderTextColor="#b0c8a0"
                   secureTextEntry
                   value={password}
                   onChangeText={setPassword}
@@ -104,106 +105,162 @@ export default function LoginScreen() {
               </Pressable>
             </View>
 
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </ImageBackground>
+            <Pressable
+              style={({ pressed }) => [styles.backHomeBtn, pressed && styles.pressed]}
+              onPress={() => router.push('/')}>
+              <Text style={styles.backHomeBtnText}>← Volver al inicio</Text>
+            </Pressable>
+          </View>
+
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-  },
   safeArea: {
     flex: 1,
+    backgroundColor: '#ffffff',
   },
   kav: {
     flex: 1,
   },
-  scroll: {
+  scrollOuter: {
     flexGrow: 1,
-    justifyContent: 'center',
+    paddingBottom: 40,
+    backgroundColor: '#ffffff',
+  },
+
+  /* Encabezado */
+  header: {
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 32,
+    paddingTop: 64,
+    paddingBottom: 64,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
   },
-  logo: {
-    width: 130,
-    height: 130,
-    marginBottom: 16,
-    alignSelf: 'center',
+  headerBlob: {
+    position: 'absolute',
+    top: -60,
+    right: -60,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  card: {
-    backgroundColor: 'rgba(30, 38, 30, 0.82)',
-    borderRadius: 20,
+  title: {
+    color: '#ffffff',
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginBottom: 10,
+  },
+  subtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+
+  /* Contenido */
+  content: {
+    paddingHorizontal: 24,
+  },
+  floatingCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
     padding: 24,
     gap: 12,
-    width: '100%',
-    maxWidth: 420,
+    marginTop: -44,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 8,
   },
   cardTitle: {
-    color: '#ffffff',
-    fontSize: 26,
-    fontWeight: '700',
+    color: '#1a2e1a',
+    fontSize: 22,
+    fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 2,
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#eef0ea',
     marginBottom: 4,
   },
   fieldGroup: {
     gap: 5,
   },
   label: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'left',
+    color: '#2E7D32',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   input: {
-    backgroundColor: '#EAFCD0',
-    borderRadius: 8,
+    backgroundColor: '#f7f9f5',
+    borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 13,
     fontSize: 15,
-    color: '#2a3d25',
-    textAlign: 'left',
+    color: '#1a2e1a',
+    borderWidth: 1,
+    borderColor: '#d4edbc',
   },
   forgotPassword: {
-    color: '#ffffff',
+    color: '#2E7D32',
     fontSize: 12,
+    fontWeight: '600',
     textAlign: 'center',
-    opacity: 0.9,
     marginTop: 2,
   },
   loginButton: {
-    backgroundColor: '#4EC920',
-    borderRadius: 10,
-    paddingVertical: 14,
+    backgroundColor: '#2E7D32',
+    borderRadius: 12,
+    paddingVertical: 15,
     alignItems: 'center',
     marginTop: 4,
+    shadowColor: '#2E7D32',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
   },
   pressed: {
-    opacity: 0.85,
+    opacity: 0.8,
   },
   loginButtonText: {
     color: '#ffffff',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
   registerLink: {
-    color: '#ffffff',
+    color: '#555',
     fontSize: 13,
     textAlign: 'center',
-    opacity: 0.85,
     marginTop: 2,
+  },
+
+  /* Volver al inicio */
+  backHomeBtn: {
+    alignSelf: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 22,
+  },
+  backHomeBtnText: {
+    color: '#555',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

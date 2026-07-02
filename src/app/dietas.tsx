@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { dietasApi, Dieta } from '@/services/api';
 
@@ -26,6 +27,23 @@ function colorFor(key: string) {
   let hash = 0;
   for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
   return CHIP_PALETTE[hash % CHIP_PALETTE.length];
+}
+
+function SearchIcon() {
+  return (
+    <View style={styles.searchIconWrap}>
+      <View style={styles.searchIconCircle} />
+      <View style={styles.searchIconHandle} />
+    </View>
+  );
+}
+
+function PlateIcon() {
+  return (
+    <View style={styles.plateIconWrap}>
+      <View style={styles.plateIconInner} />
+    </View>
+  );
 }
 
 export default function DietasScreen() {
@@ -84,7 +102,7 @@ export default function DietasScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={styles.scrollOuter}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -96,140 +114,164 @@ export default function DietasScreen() {
           />
         }>
 
-        <View style={styles.nav}>
+        {/* Encabezado en degradado */}
+        <LinearGradient
+          colors={['#4EC920', '#1B5E20']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}>
+          <View pointerEvents="none" style={styles.headerBlob} />
+
           <Pressable
             style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
             onPress={() => router.back()}>
             <Text style={styles.backBtnText}>← Volver</Text>
           </Pressable>
-        </View>
 
-        <Text style={styles.title}>Dietas</Text>
-        <Text style={styles.subtitle}>
-          {loading ? 'Planes de alimentación disponibles.' : `${filtered.length} de ${dietas.length} planes`}
-        </Text>
+          <View style={styles.headerTitleRow}>
+            <PlateIcon />
+            <Text style={styles.title}>Dietas</Text>
+          </View>
+          <Text style={styles.subtitle}>
+            {loading
+              ? 'Planes de alimentación disponibles'
+              : `${filtered.length} de ${dietas.length} planes · ${objetivos.length} objetivos`}
+          </Text>
+        </LinearGradient>
 
-        <View style={styles.greenDivider} />
+        <View style={styles.content}>
 
-        {!loading && !error && dietas.length > 0 && (
-          <>
-            <TextInput
-              style={styles.searchInput}
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Buscar dieta..."
-              placeholderTextColor="#a8a8a8"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+          {!loading && !error && dietas.length > 0 && (
+            <View style={styles.floatingCard}>
+              <View style={styles.searchRow}>
+                <SearchIcon />
+                <TextInput
+                  style={styles.searchInput}
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Buscar dieta..."
+                  placeholderTextColor="#a8a8a8"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chipsRow}>
-              <Pressable
-                style={[styles.chip, !selectedObjetivo && styles.chipActive]}
-                onPress={() => setSelectedObjetivo(null)}>
-                <Text style={[styles.chipText, !selectedObjetivo && styles.chipTextActive]}>
-                  Todos
-                </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipsRow}>
+                <Pressable
+                  style={[styles.chip, !selectedObjetivo && styles.chipActive]}
+                  onPress={() => setSelectedObjetivo(null)}>
+                  <Text style={[styles.chipText, !selectedObjetivo && styles.chipTextActive]}>
+                    Todos
+                  </Text>
+                </Pressable>
+                {objetivos.map((o) => {
+                  const active = selectedObjetivo === o.key;
+                  return (
+                    <Pressable
+                      key={o.key}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setSelectedObjetivo(active ? null : o.key)}>
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {o.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          {loading && !refreshing ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color="#4EC920" />
+              <Text style={styles.loadingText}>Cargando dietas...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorTitle}>No se pudo cargar</Text>
+              <Text style={styles.errorText}>{error}</Text>
+              <Pressable onPress={() => fetchData()} style={styles.retryBtn}>
+                <Text style={styles.retryText}>Reintentar</Text>
               </Pressable>
-              {objetivos.map((o) => {
-                const active = selectedObjetivo === o.key;
+            </View>
+          ) : dietas.length === 0 ? (
+            <Text style={styles.emptyText}>No hay dietas disponibles por el momento.</Text>
+          ) : filtered.length === 0 ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.emptyText}>No se encontraron dietas con esos filtros.</Text>
+              <Pressable onPress={clearFilters} style={styles.retryBtn}>
+                <Text style={styles.retryText}>Limpiar filtros</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.list}>
+              {filtered.map((d) => {
+                const objColor = colorFor(d.objetivo);
                 return (
-                  <Pressable
-                    key={o.key}
-                    style={[styles.chip, active && styles.chipActive]}
-                    onPress={() => setSelectedObjetivo(active ? null : o.key)}>
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {o.label}
+                  <View key={d.id} style={[styles.card, { borderLeftColor: objColor.text }]}>
+                    <View style={styles.cardTopRow}>
+                      <View
+                        style={[
+                          styles.iconBadge,
+                          { backgroundColor: objColor.bg, shadowColor: objColor.text },
+                        ]}>
+                        <Text style={[styles.iconBadgeText, { color: objColor.text }]}>
+                          {d.nombre[0]?.toUpperCase() ?? '?'}
+                        </Text>
+                      </View>
+                      <View style={styles.cardTopInfo}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>{d.nombre}</Text>
+                        <View style={[styles.metaChip, { backgroundColor: objColor.bg }]}>
+                          <Text style={[styles.metaChipText, { color: objColor.text }]} numberOfLines={1}>
+                            {d.objetivo_nombre}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.durationBadge}>
+                        <Text style={styles.durationBadgeText}>{d.duracion_dias}d</Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.cardDescription} numberOfLines={2}>
+                      {d.descripcion}
                     </Text>
-                  </Pressable>
+
+                    <View style={styles.statsRow}>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{d.calorias_diarias}</Text>
+                        <Text style={styles.statLabel}>kcal/dia</Text>
+                      </View>
+                      <View style={styles.statDivider} />
+                      <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{d.comidas_por_dia}</Text>
+                        <Text style={styles.statLabel}>comidas/dia</Text>
+                      </View>
+                      <View style={styles.statDivider} />
+                      <View style={styles.statItem}>
+                        <Text style={styles.statValue} numberOfLines={1}>{d.nivel_actividad_nombre}</Text>
+                        <Text style={styles.statLabel}>actividad</Text>
+                      </View>
+                    </View>
+
+                    {d.restricciones?.length > 0 ? (
+                      <View style={styles.restriccionesRow}>
+                        {d.restricciones.map((r) => (
+                          <View key={r} style={styles.restriccionTag}>
+                            <Text style={styles.restriccionText}>{r.replace(/_/g, ' ')}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
                 );
               })}
-            </ScrollView>
-          </>
-        )}
+            </View>
+          )}
 
-        {loading && !refreshing ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#4EC920" />
-            <Text style={styles.loadingText}>Cargando dietas...</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorTitle}>No se pudo cargar</Text>
-            <Text style={styles.errorText}>{error}</Text>
-            <Pressable onPress={() => fetchData()} style={styles.retryBtn}>
-              <Text style={styles.retryText}>Reintentar</Text>
-            </Pressable>
-          </View>
-        ) : dietas.length === 0 ? (
-          <Text style={styles.emptyText}>No hay dietas disponibles por el momento.</Text>
-        ) : filtered.length === 0 ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.emptyText}>No se encontraron dietas con esos filtros.</Text>
-            <Pressable onPress={clearFilters} style={styles.retryBtn}>
-              <Text style={styles.retryText}>Limpiar filtros</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.list}>
-            {filtered.map((d) => {
-              const objColor = colorFor(d.objetivo);
-              return (
-                <View key={d.id} style={styles.card}>
-                  <View style={styles.cardTopRow}>
-                    <View style={[styles.iconBadge, { backgroundColor: objColor.bg }]}>
-                      <Text style={[styles.iconBadgeText, { color: objColor.text }]}>
-                        {d.nombre[0]?.toUpperCase() ?? '?'}
-                      </Text>
-                    </View>
-                    <View style={styles.cardTopInfo}>
-                      <Text style={styles.cardTitle} numberOfLines={1}>{d.nombre}</Text>
-                      <Text style={styles.cardMeta} numberOfLines={1}>{d.objetivo_nombre}</Text>
-                    </View>
-                    <View style={styles.durationBadge}>
-                      <Text style={styles.durationBadgeText}>{d.duracion_dias}d</Text>
-                    </View>
-                  </View>
-
-                  <Text style={styles.cardDescription} numberOfLines={2}>
-                    {d.descripcion}
-                  </Text>
-
-                  <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{d.calorias_diarias}</Text>
-                      <Text style={styles.statLabel}>kcal/dia</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{d.comidas_por_dia}</Text>
-                      <Text style={styles.statLabel}>comidas/dia</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue} numberOfLines={1}>{d.nivel_actividad_nombre}</Text>
-                      <Text style={styles.statLabel}>actividad</Text>
-                    </View>
-                  </View>
-
-                  {d.restricciones?.length > 0 ? (
-                    <View style={styles.restriccionesRow}>
-                      {d.restricciones.map((r) => (
-                        <View key={r} style={styles.restriccionTag}>
-                          <Text style={styles.restriccionText}>{r.replace(/_/g, ' ')}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })}
-          </View>
-        )}
-
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -240,61 +282,140 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
-  scroll: {
+  scrollOuter: {
     flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 48,
-    gap: 4,
+    paddingBottom: 40,
     backgroundColor: '#ffffff',
   },
-  nav: {
-    marginBottom: 8,
+
+  /* Encabezado */
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 56,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
+  },
+  headerBlob: {
+    position: 'absolute',
+    top: -50,
+    right: -60,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   backBtn: {
     alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderRadius: 16,
     paddingVertical: 6,
-    paddingHorizontal: 4,
+    paddingHorizontal: 12,
+    marginBottom: 16,
   },
   backBtnText: {
-    color: '#4EC920',
-    fontSize: 15,
+    color: '#ffffff',
+    fontSize: 13,
     fontWeight: '600',
   },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.75,
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   title: {
-    color: '#1a2e1a',
-    fontSize: 26,
+    color: '#ffffff',
+    fontSize: 28,
     fontWeight: '800',
+    letterSpacing: -0.5,
   },
   subtitle: {
-    color: '#888',
+    color: 'rgba(255,255,255,0.85)',
     fontSize: 13,
-    marginTop: 4,
+    marginTop: 6,
+    fontWeight: '500',
   },
-  greenDivider: {
-    height: 3,
-    backgroundColor: '#4EC920',
-    borderRadius: 2,
-    marginTop: 14,
-    marginBottom: 14,
+
+  /* Iconos de encabezado */
+  plateIconWrap: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2.5,
+    borderColor: 'rgba(255,255,255,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  searchInput: {
+  plateIconInner: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+  },
+
+  /* Contenido */
+  content: {
+    paddingHorizontal: 20,
+  },
+  floatingCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 16,
+    marginTop: -40,
+    marginBottom: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     backgroundColor: '#f5f5f5',
     borderRadius: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#ededed',
+  },
+  searchInput: {
+    flex: 1,
     paddingVertical: 12,
     fontSize: 14,
     color: '#1a2e1a',
-    borderWidth: 1,
-    borderColor: '#ededed',
-    marginBottom: 12,
+  },
+  searchIconWrap: {
+    width: 16,
+    height: 16,
+  },
+  searchIconCircle: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#999',
+  },
+  searchIconHandle: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 6,
+    height: 1.6,
+    borderRadius: 1,
+    backgroundColor: '#999',
+    transform: [{ rotate: '45deg' }],
   },
   chipsRow: {
     gap: 8,
-    paddingBottom: 16,
+    paddingTop: 14,
   },
   chip: {
     backgroundColor: '#f5f5f5',
@@ -305,8 +426,8 @@ const styles = StyleSheet.create({
     borderColor: '#ededed',
   },
   chipActive: {
-    backgroundColor: '#4EC920',
-    borderColor: '#4EC920',
+    backgroundColor: '#2E7D32',
+    borderColor: '#2E7D32',
   },
   chipText: {
     color: '#666',
@@ -316,6 +437,8 @@ const styles = StyleSheet.create({
   chipTextActive: {
     color: '#ffffff',
   },
+
+  /* Lista de dietas */
   list: {
     gap: 12,
   },
@@ -326,6 +449,7 @@ const styles = StyleSheet.create({
     gap: 12,
     borderWidth: 1,
     borderColor: '#ebebeb',
+    borderLeftWidth: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.07,
@@ -338,12 +462,16 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   iconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 46,
+    height: 46,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
   iconBadgeText: {
     fontSize: 18,
@@ -357,10 +485,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  cardMeta: {
-    color: '#999',
-    fontSize: 12,
-    marginTop: 2,
+  metaChip: {
+    alignSelf: 'flex-start',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 5,
+  },
+  metaChipText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   durationBadge: {
     backgroundColor: '#edfde0',
@@ -371,7 +505,7 @@ const styles = StyleSheet.create({
     borderColor: '#b6f088',
   },
   durationBadgeText: {
-    color: '#4EC920',
+    color: '#2E7D32',
     fontSize: 12,
     fontWeight: '800',
   },

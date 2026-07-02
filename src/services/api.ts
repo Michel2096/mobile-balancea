@@ -191,3 +191,46 @@ export const dashboardApi = {
   getActivity: (userId: number) =>
     request<ActivityItem[]>(`/dashboard/activity/${userId}`),
 };
+
+export type CartItemPayload = {
+  suplemento_id: number;
+  nombre: string;
+  cantidad: number;
+  precio_unitario: number;
+};
+
+export type OrdenCarritoPayload = {
+  nombre_usuario: string;
+  telefono_usuario: string;
+  items: CartItemPayload[];
+  precio_total: number;
+  metodo_pago?: string;
+  notas?: string;
+};
+
+export type OrdenResponse = {
+  msg: string;
+  orden: {
+    id: number;
+    codigo_unico: string;
+    estado: string;
+    precio_total: number;
+  };
+  notificaciones_generadas: boolean;
+};
+
+export const ordenesApi = {
+  createCarrito: (payload: OrdenCarritoPayload) =>
+    request<OrdenResponse>('/ordenes/', {
+      method: 'POST',
+      body: JSON.stringify({
+        nombre_usuario: payload.nombre_usuario,
+        telefono_usuario: payload.telefono_usuario,
+        tipo_pedido: 'carrito',
+        pedido_json: JSON.stringify({ items: payload.items }),
+        precio_total: payload.precio_total,
+        metodo_pago: payload.metodo_pago ?? 'efectivo',
+        notas: payload.notas,
+      }),
+    }),
+};
