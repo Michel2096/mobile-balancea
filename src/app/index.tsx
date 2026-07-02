@@ -1,189 +1,314 @@
-import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
-export default function LandingScreen() {
+const COLORS = {
+  primaryGreen: '#2E7D32',
+  lightGreen: '#66BB6A',
+  softGreen: '#A5D6A7',
+  white: '#FFFFFF',
+  lightGray: '#F5F5F5',
+  textDark: '#263238',
+  textMuted: '#6B7B6E',
+};
+
+function NutritionIcon() {
   return (
-    <ImageBackground
-      source={require('../../assets/Fondo.png')}
-      style={styles.background}
-      resizeMode="cover">
-      <View style={styles.overlay} />
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}>
+    <View style={styles.iconPlate}>
+      <View style={styles.iconPlateInner} />
+    </View>
+  );
+}
 
-          <Image
-            source={require('../../assets/images/logo-glow.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+function TrackingIcon() {
+  return (
+    <View style={styles.iconBars}>
+      <View style={[styles.iconBar, { height: 9 }]} />
+      <View style={[styles.iconBar, { height: 15 }]} />
+      <View style={[styles.iconBar, { height: 21 }]} />
+    </View>
+  );
+}
 
+function WellnessIcon() {
+  return (
+    <View style={styles.iconCrossWrap}>
+      <View style={styles.iconCrossV} />
+      <View style={styles.iconCrossH} />
+    </View>
+  );
+}
+
+const CARDS = [
+  {
+    key: 'nutricion',
+    title: 'Nutrición Inteligente',
+    description: 'Recibe recomendaciones personalizadas.',
+    Icon: NutritionIcon,
+  },
+  {
+    key: 'seguimiento',
+    title: 'Seguimiento Diario',
+    description: 'Registra tus comidas y progreso.',
+    Icon: TrackingIcon,
+  },
+  {
+    key: 'vida',
+    title: 'Vida Saludable',
+    description: 'Construye hábitos que duren toda la vida.',
+    Icon: WellnessIcon,
+  },
+];
+
+export default function HomeScreen() {
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}>
+
+        {/* Encabezado */}
+        <View style={styles.header}>
+          <View style={styles.logoWrap}>
+            <Image
+              source={require('../../assets/images/logo-glow.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
           <Text style={styles.brand}>Balancea</Text>
-          <Text style={styles.tagline}>Tu equilibrio, tu bienestar</Text>
+          <Text style={styles.tagline}>
+            Tu bienestar comienza con una mejor alimentación.
+          </Text>
+        </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Bienvenido a Balancea</Text>
-            <View style={styles.divider} />
-
-            <Text style={styles.description}>
-              Balancea es una aplicación diseñada para ayudarte a mantener un estilo de vida saludable
-              y equilibrado. Registra tus hábitos, monitorea tu progreso y alcanza tus metas de
-              bienestar físico y mental.
-            </Text>
-
-            <View style={styles.featuresContainer}>
-              <View style={styles.feature}>
-                <Text style={styles.featureText}>Seguimiento de habitos diarios</Text>
+        {/* Tarjetas informativas */}
+        <View style={styles.cardsWrap}>
+          {CARDS.map(({ key, title, description, Icon }) => (
+            <View key={key} style={styles.card}>
+              <View style={styles.cardIconBadge}>
+                <Icon />
               </View>
-              <View style={styles.feature}>
-                <Text style={styles.featureText}>Metas personalizadas de bienestar</Text>
-              </View>
-              <View style={styles.feature}>
-                <Text style={styles.featureText}>Balance fisico y mental</Text>
+              <View style={styles.cardTextWrap}>
+                <Text style={styles.cardTitle}>{title}</Text>
+                <Text style={styles.cardDescription}>{description}</Text>
               </View>
             </View>
+          ))}
+        </View>
 
-            <View style={styles.divider} />
+        {/* Botones */}
+        <View style={styles.ctaSection}>
+          <Pressable
+            style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
+            onPress={() => router.push('/login')}>
+            <Text style={styles.primaryBtnText}>Comenzar</Text>
+          </Pressable>
 
-            <Text style={styles.loginHint}>
-              Para acceder a todas las funciones, inicia sesión con tu cuenta.
-            </Text>
+          <Pressable
+            style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
+            onPress={() => router.push('/sobre-nosotros')}>
+            <Text style={styles.secondaryBtnText}>Conocer más</Text>
+          </Pressable>
+        </View>
 
-            <Pressable
-              style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
-              onPress={() => router.push('/login')}>
-              <Text style={styles.primaryButtonText}>Iniciar Sesión</Text>
-            </Pressable>
+        {/* Footer */}
+        <Text style={styles.footerText}>Balancea © 2026</Text>
 
-            <Pressable
-              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-              onPress={() => router.push('/sobre-nosotros')}>
-              <Text style={styles.secondaryButtonText}>Sobre Nosotros</Text>
-            </Pressable>
-          </View>
-
-        </ScrollView>
-      </SafeAreaView>
-    </ImageBackground>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.50)',
-  },
   safeArea: {
     flex: 1,
+    backgroundColor: COLORS.white,
   },
   scroll: {
     flexGrow: 1,
-    alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingTop: 36,
+    paddingBottom: 32,
+    backgroundColor: COLORS.white,
+  },
+
+  /* Encabezado */
+  header: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  logoWrap: {
+    width: 96,
+    height: 96,
+    borderRadius: 26,
+    backgroundColor: COLORS.lightGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+    shadowColor: COLORS.primaryGreen,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
   },
   logo: {
-    width: 110,
-    height: 110,
-    marginBottom: 12,
+    width: 58,
+    height: 58,
   },
   brand: {
-    color: '#4EC920',
-    fontSize: 38,
+    fontSize: 34,
     fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 4,
+    color: COLORS.primaryGreen,
+    letterSpacing: -0.5,
+    marginBottom: 8,
   },
   tagline: {
-    color: 'rgba(255,255,255,0.75)',
     fontSize: 15,
-    fontStyle: 'italic',
-    marginBottom: 28,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 21,
+    paddingHorizontal: 12,
+  },
+
+  /* Tarjetas */
+  cardsWrap: {
+    gap: 14,
+    marginBottom: 32,
   },
   card: {
-    backgroundColor: 'rgba(20, 32, 20, 0.88)',
-    borderRadius: 20,
-    padding: 24,
-    gap: 14,
-    width: '100%',
-    maxWidth: 440,
-    borderWidth: 1,
-    borderColor: 'rgba(78, 201, 32, 0.25)',
-  },
-  cardTitle: {
-    color: '#ffffff',
-    fontSize: 22,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  description: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 14,
-    lineHeight: 22,
-    textAlign: 'center',
-  },
-  featuresContainer: {
-    gap: 10,
-  },
-  feature: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    backgroundColor: 'rgba(78, 201, 32, 0.1)',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    gap: 16,
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#EDEDED',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  featureIcon: {
-    fontSize: 20,
+  cardIconBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: COLORS.primaryGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
-  featureText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-    fontWeight: '500',
+  cardTextWrap: {
     flex: 1,
   },
-  loginHint: {
-    color: 'rgba(255,255,255,0.65)',
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.textDark,
+    marginBottom: 4,
+  },
+  cardDescription: {
     fontSize: 13,
-    textAlign: 'center',
-    fontStyle: 'italic',
+    color: COLORS.textMuted,
+    lineHeight: 18,
   },
-  primaryButton: {
-    backgroundColor: '#4EC920',
+
+  /* Iconos */
+  iconPlate: {
+    width: 24,
+    height: 24,
     borderRadius: 12,
-    paddingVertical: 15,
+    borderWidth: 2.5,
+    borderColor: COLORS.white,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  primaryButtonText: {
-    color: '#ffffff',
+  iconPlateInner: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: COLORS.white,
+  },
+  iconBars: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 3,
+    height: 21,
+  },
+  iconBar: {
+    width: 5,
+    borderRadius: 2,
+    backgroundColor: COLORS.white,
+  },
+  iconCrossWrap: {
+    width: 24,
+    height: 24,
+  },
+  iconCrossV: {
+    position: 'absolute',
+    left: 9,
+    top: 1,
+    width: 6,
+    height: 22,
+    borderRadius: 3,
+    backgroundColor: COLORS.white,
+  },
+  iconCrossH: {
+    position: 'absolute',
+    left: 1,
+    top: 9,
+    width: 22,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.white,
+  },
+
+  /* Botones */
+  ctaSection: {
+    gap: 12,
+    marginBottom: 28,
+  },
+  primaryBtn: {
+    backgroundColor: COLORS.primaryGreen,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    shadowColor: COLORS.primaryGreen,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  primaryBtnText: {
+    color: COLORS.white,
     fontSize: 17,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    borderRadius: 12,
-    paddingVertical: 13,
+  secondaryBtn: {
+    borderRadius: 16,
+    paddingVertical: 15,
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(78, 201, 32, 0.6)',
+    borderColor: COLORS.softGreen,
+    backgroundColor: COLORS.lightGray,
   },
-  secondaryButtonText: {
-    color: '#4EC920',
+  secondaryBtnText: {
+    color: COLORS.primaryGreen,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   pressed: {
-    opacity: 0.8,
+    opacity: 0.75,
+  },
+
+  /* Footer */
+  footerText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    textAlign: 'center',
   },
 });

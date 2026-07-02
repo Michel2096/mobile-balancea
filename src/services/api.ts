@@ -1,3 +1,5 @@
+import { router } from 'expo-router';
+
 const BASE_URL = 'http://localhost:5000';
 
 let _token: string | null = null;
@@ -47,6 +49,14 @@ async function request<T = unknown>(path: string, options: RequestInit = {}): Pr
 
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
   const data = await res.json();
+
+  if (res.status === 401) {
+    clearToken();
+    clearUser();
+    router.replace('/login');
+    throw new Error('Tu sesión expiró. Inicia sesión nuevamente.');
+  }
+
   if (!res.ok) throw new Error(data.msg || 'Error en la solicitud');
   return data as T;
 }
@@ -102,6 +112,62 @@ export const userApi = {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
+
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ msg: string }>('/user/change-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    }),
+};
+
+export type Suplemento = {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  precio: number;
+  categoria: string;
+  categoria_nombre: string;
+  presentacion: string;
+  presentacion_nombre: string;
+  beneficios: string | null;
+  modo_uso: string | null;
+  stock: number;
+  activo: boolean;
+};
+
+export const suplementosApi = {
+  getActive: () => request<Suplemento[]>('/suplementos/active'),
+};
+
+export type Dieta = {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  objetivo: string;
+  objetivo_nombre: string;
+  duracion_dias: number;
+  calorias_diarias: number;
+  nivel_actividad: string;
+  nivel_actividad_nombre: string;
+  restricciones: string[];
+  comidas_por_dia: number;
+  activo: boolean;
+};
+
+type DietasResponse = {
+  success: boolean;
+  data: Dieta[];
+  total: number;
+};
+
+export const dietasApi = {
+  getAll: async () => {
+    const res = await request<DietasResponse>('/dietas/');
+    return res.data;
+  },
 };
 
 export type DashboardSummary = {
