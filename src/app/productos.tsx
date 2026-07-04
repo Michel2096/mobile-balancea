@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { suplementosApi, Suplemento } from '@/services/api';
 import { addToCart, getCartCount, useCart } from '@/services/cart';
+import { useAppPreferences } from '@/context/app-preferences';
 
 const CHIP_PALETTE = [
   { bg: '#E8F5E9', text: '#2E7D32' },
@@ -53,6 +54,7 @@ function BasketIcon() {
 }
 
 export default function ProductosScreen() {
+  const { isDark, t } = useAppPreferences();
   const [productos, setProductos] = useState<Suplemento[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -69,7 +71,7 @@ export default function ProductosScreen() {
       const data = await suplementosApi.getActive();
       setProductos(data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error al cargar los productos');
+      setError(err instanceof Error ? err.message : t('loadErrorFallback'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -108,9 +110,9 @@ export default function ProductosScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, isDark && darkStyles.safeArea]}>
       <ScrollView
-        contentContainerStyle={styles.scrollOuter}
+        contentContainerStyle={[styles.scrollOuter, isDark && darkStyles.scrollOuter]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -134,7 +136,7 @@ export default function ProductosScreen() {
             <Pressable
               style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
               onPress={() => router.back()}>
-              <Text style={styles.backBtnText}>← Volver</Text>
+              <Text style={styles.backBtnText}>{t('backVolver')}</Text>
             </Pressable>
 
             <Pressable
@@ -150,25 +152,29 @@ export default function ProductosScreen() {
             </Pressable>
           </View>
 
-          <Text style={styles.title}>Productos</Text>
+          <Text style={styles.title}>{t('menuProductos')}</Text>
           <Text style={styles.subtitle}>
             {loading
-              ? 'Suplementos disponibles en Balancea'
-              : `${filtered.length} de ${productos.length} suplementos · ${categorias.length} categorías`}
+              ? t('productosSubtitleLoading')
+              : t('productosSubtitleResult', {
+                  filtered: filtered.length,
+                  total: productos.length,
+                  cats: categorias.length,
+                })}
           </Text>
         </LinearGradient>
 
         <View style={styles.content}>
 
           {!loading && !error && productos.length > 0 && (
-            <View style={styles.floatingCard}>
-              <View style={styles.searchRow}>
+            <View style={[styles.floatingCard, isDark && darkStyles.card]}>
+              <View style={[styles.searchRow, isDark && darkStyles.searchRow]}>
                 <SearchIcon />
                 <TextInput
-                  style={styles.searchInput}
+                  style={[styles.searchInput, isDark && darkStyles.searchInput]}
                   value={search}
                   onChangeText={setSearch}
-                  placeholder="Buscar producto..."
+                  placeholder={t('searchProducto')}
                   placeholderTextColor="#a8a8a8"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -183,7 +189,7 @@ export default function ProductosScreen() {
                   style={[styles.chip, !selectedCategoria && styles.chipActive]}
                   onPress={() => setSelectedCategoria(null)}>
                   <Text style={[styles.chipText, !selectedCategoria && styles.chipTextActive]}>
-                    Todos
+                    {t('chipTodos')}
                   </Text>
                 </Pressable>
                 {categorias.map((c) => {
@@ -206,23 +212,25 @@ export default function ProductosScreen() {
           {loading && !refreshing ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color="#4EC920" />
-              <Text style={styles.loadingText}>Cargando productos...</Text>
+              <Text style={styles.loadingText}>{t('loadingProductos')}</Text>
             </View>
           ) : error ? (
             <View style={styles.errorBox}>
-              <Text style={styles.errorTitle}>No se pudo cargar</Text>
+              <Text style={[styles.errorTitle, isDark && darkStyles.cardTitle]}>
+                {t('loadErrorTitle')}
+              </Text>
               <Text style={styles.errorText}>{error}</Text>
               <Pressable onPress={() => fetchData()} style={styles.retryBtn}>
-                <Text style={styles.retryText}>Reintentar</Text>
+                <Text style={styles.retryText}>{t('retry')}</Text>
               </Pressable>
             </View>
           ) : productos.length === 0 ? (
-            <Text style={styles.emptyText}>No hay productos disponibles por el momento.</Text>
+            <Text style={styles.emptyText}>{t('noProductos')}</Text>
           ) : filtered.length === 0 ? (
             <View style={styles.errorBox}>
-              <Text style={styles.emptyText}>No se encontraron productos con esos filtros.</Text>
+              <Text style={styles.emptyText}>{t('noProductosFiltro')}</Text>
               <Pressable onPress={clearFilters} style={styles.retryBtn}>
-                <Text style={styles.retryText}>Limpiar filtros</Text>
+                <Text style={styles.retryText}>{t('limpiarFiltros')}</Text>
               </Pressable>
             </View>
           ) : (
@@ -234,7 +242,9 @@ export default function ProductosScreen() {
                 const maxedOut = !outOfStock && inCartQty >= p.stock;
                 const addDisabled = outOfStock || maxedOut;
                 return (
-                  <View key={p.id} style={[styles.card, { borderLeftColor: catColor.text }]}>
+                  <View
+                    key={p.id}
+                    style={[styles.card, isDark && darkStyles.card, { borderLeftColor: catColor.text }]}>
                     <View style={styles.cardTopRow}>
                       <View
                         style={[
@@ -246,7 +256,11 @@ export default function ProductosScreen() {
                         </Text>
                       </View>
                       <View style={styles.cardTopInfo}>
-                        <Text style={styles.cardTitle} numberOfLines={1}>{p.nombre}</Text>
+                        <Text
+                          style={[styles.cardTitle, isDark && darkStyles.cardTitle]}
+                          numberOfLines={1}>
+                          {p.nombre}
+                        </Text>
                         <View style={styles.cardMetaRow}>
                           <View style={[styles.metaChip, { backgroundColor: catColor.bg }]}>
                             <Text style={[styles.metaChipText, { color: catColor.text }]} numberOfLines={1}>
@@ -269,7 +283,7 @@ export default function ProductosScreen() {
                       <View style={styles.stockRow}>
                         <View style={[styles.stockDot, p.stock > 0 ? styles.stockDotOk : styles.stockDotLow]} />
                         <Text style={styles.stockText}>
-                          {p.stock > 0 ? `${p.stock} en stock` : 'Sin stock'}
+                          {p.stock > 0 ? t('enStock', { n: p.stock }) : t('sinStock')}
                         </Text>
                       </View>
 
@@ -282,7 +296,11 @@ export default function ProductosScreen() {
                         ]}
                         onPress={() => addToCart(p, 1)}>
                         <Text style={[styles.addBtnText, addDisabled && styles.addBtnTextDisabled]}>
-                          {outOfStock ? 'Sin stock' : inCartQty > 0 ? `En carrito · ${inCartQty}` : 'Agregar'}
+                          {outOfStock
+                            ? t('sinStock')
+                            : inCartQty > 0
+                            ? t('enCarrito', { n: inCartQty })
+                            : t('agregarCarrito')}
                         </Text>
                       </Pressable>
                     </View>
@@ -667,5 +685,28 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '700',
+  },
+});
+
+const darkStyles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: '#121212',
+  },
+  scrollOuter: {
+    backgroundColor: '#121212',
+  },
+  card: {
+    backgroundColor: '#1e1e1e',
+    borderColor: '#2a2a2a',
+  },
+  cardTitle: {
+    color: '#f2f2f2',
+  },
+  searchRow: {
+    backgroundColor: '#262626',
+    borderColor: '#333',
+  },
+  searchInput: {
+    color: '#f2f2f2',
   },
 });

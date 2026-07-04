@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -14,20 +14,30 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { getUser, clearToken, clearUser, dashboardApi, DashboardSummary, ActivityItem } from '@/services/api';
 import { getCartCount, useCart } from '@/services/cart';
+import { useAppPreferences } from '@/context/app-preferences';
+import { Language } from '@/i18n/translations';
 
 type MenuItem = {
   key: string;
-  label: string;
-  route: '/(tabs)' | '/productos' | '/sobre-nosotros' | '/dietas' | '/configuracion' | '/carrito';
+  labelKey: string;
+  route:
+    | '/(tabs)'
+    | '/productos'
+    | '/sobre-nosotros'
+    | '/dietas'
+    | '/configuracion'
+    | '/carrito'
+    | '/(tabs)/profile';
 };
 
 const MENU_ITEMS: MenuItem[] = [
-  { key: 'inicio', label: 'Inicio', route: '/(tabs)' },
-  { key: 'productos', label: 'Productos', route: '/productos' },
-  { key: 'carrito', label: 'Carrito', route: '/carrito' },
-  { key: 'nosotros', label: 'Nosotros', route: '/sobre-nosotros' },
-  { key: 'dietas', label: 'Dietas', route: '/dietas' },
-  { key: 'configuracion', label: 'Configuración', route: '/configuracion' },
+  { key: 'inicio', labelKey: 'menuInicio', route: '/(tabs)' },
+  { key: 'perfil', labelKey: 'menuMiPerfil', route: '/(tabs)/profile' },
+  { key: 'productos', labelKey: 'menuProductos', route: '/productos' },
+  { key: 'carrito', labelKey: 'menuCarrito', route: '/carrito' },
+  { key: 'nosotros', labelKey: 'menuNosotros', route: '/sobre-nosotros' },
+  { key: 'dietas', labelKey: 'menuDietas', route: '/dietas' },
+  { key: 'configuracion', labelKey: 'menuConfiguracion', route: '/configuracion' },
 ];
 
 function BasketIcon() {
@@ -39,15 +49,15 @@ function BasketIcon() {
   );
 }
 
-function greeting() {
+function greetingKey() {
   const h = new Date().getHours();
-  if (h < 12) return 'Buenos dias';
-  if (h < 19) return 'Buenas tardes';
-  return 'Buenas noches';
+  if (h < 12) return 'greetingMorning';
+  if (h < 19) return 'greetingAfternoon';
+  return 'greetingEvening';
 }
 
-function formatDate() {
-  return new Date().toLocaleDateString('es-MX', {
+function formatDate(language: Language) {
+  return new Date().toLocaleDateString(language === 'es' ? 'es-MX' : 'en-US', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -55,14 +65,14 @@ function formatDate() {
   });
 }
 
-function formatRelative(dateStr: string) {
+function formatRelative(dateStr: string, t: (key: string, params?: Record<string, string | number>) => string) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const hours = Math.floor(diff / 3_600_000);
-  if (hours < 1) return 'Hace menos de 1h';
-  if (hours < 24) return `Hace ${hours}h`;
+  if (hours < 1) return t('timeLessThanHour');
+  if (hours < 24) return t('timeHoursAgo', { n: hours });
   const days = Math.floor(hours / 24);
-  if (days === 1) return 'Ayer';
-  return `Hace ${days} dias`;
+  if (days === 1) return t('timeYesterday');
+  return t('timeDaysAgo', { n: days });
 }
 
 type StatCardProps = {
@@ -70,19 +80,25 @@ type StatCardProps = {
   value: string;
   unit?: string;
   accent?: boolean;
+  isDark: boolean;
 };
 
-function StatCard({ label, value, unit, accent }: StatCardProps) {
+function StatCard({ label, value, unit, accent, isDark }: StatCardProps) {
   return (
-    <View style={[styles.statCard, accent && styles.statCardAccent]}>
-      <Text style={[styles.statValue, accent && styles.statValueAccent]}>{value}</Text>
-      {unit ? <Text style={[styles.statUnit, accent && styles.statUnitAccent]}>{unit}</Text> : null}
+    <View style={[styles.statCard, isDark && darkStyles.statCard, accent && styles.statCardAccent]}>
+      <Text style={[styles.statValue, isDark && darkStyles.statValue, accent && styles.statValueAccent]}>
+        {value}
+      </Text>
+      {unit ? (
+        <Text style={[styles.statUnit, accent && styles.statUnitAccent]}>{unit}</Text>
+      ) : null}
       <Text style={[styles.statLabel, accent && styles.statLabelAccent]}>{label}</Text>
     </View>
   );
 }
 
 export default function DashboardScreen() {
+  const { isDark, language, t } = useAppPreferences();
   const user = getUser();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
@@ -116,7 +132,7 @@ export default function DashboardScreen() {
       setSummary(s);
       setActivity(a);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error al cargar el dashboard');
+      setError(err instanceof Error ? err.message : t('loadErrorFallback'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -138,9 +154,9 @@ export default function DashboardScreen() {
   const firstName = user?.nombre?.split(' ')[0] ?? 'Usuario';
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, isDark && darkStyles.safeArea]}>
       <ScrollView
-        contentContainerStyle={styles.scrollOuter}
+        contentContainerStyle={[styles.scrollOuter, isDark && darkStyles.scrollOuter]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -180,17 +196,17 @@ export default function DashboardScreen() {
                 )}
               </Pressable>
 
-              <View style={styles.avatarCircle}>
+              <Pressable onPress={() => router.push('/(tabs)/profile')} style={styles.avatarCircle}>
                 <Text style={styles.avatarLetter}>
                   {(user?.nombre ?? 'U')[0].toUpperCase()}
                 </Text>
-              </View>
+              </Pressable>
             </View>
           </View>
 
-          <Text style={styles.greetingText}>{greeting()},</Text>
+          <Text style={styles.greetingText}>{t(greetingKey())},</Text>
           <Text style={styles.nameText}>{firstName}</Text>
-          <Text style={styles.dateText}>{formatDate()}</Text>
+          <Text style={styles.dateText}>{formatDate(language)}</Text>
         </LinearGradient>
 
         <Modal
@@ -199,7 +215,9 @@ export default function DashboardScreen() {
           animationType="fade"
           onRequestClose={() => setMenuVisible(false)}>
           <Pressable style={styles.menuOverlay} onPress={() => setMenuVisible(false)} />
-          <SafeAreaView style={styles.menuPanel} edges={['top', 'left', 'bottom']}>
+          <SafeAreaView
+            style={[styles.menuPanel, isDark && darkStyles.menuPanel]}
+            edges={['top', 'left', 'bottom']}>
             <LinearGradient
               colors={['#4EC920', '#1B5E20']}
               start={{ x: 0, y: 0 }}
@@ -219,10 +237,16 @@ export default function DashboardScreen() {
               {MENU_ITEMS.map((item) => (
                 <Pressable
                   key={item.key}
-                  style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+                  style={({ pressed }) => [
+                    styles.menuItem,
+                    isDark && darkStyles.menuItem,
+                    pressed && styles.menuItemPressed,
+                  ]}
                   onPress={() => handleSelectMenuItem(item)}>
                   <View style={styles.menuItemDot} />
-                  <Text style={styles.menuItemText}>{item.label}</Text>
+                  <Text style={[styles.menuItemText, isDark && darkStyles.menuItemText]}>
+                    {t(item.labelKey)}
+                  </Text>
                   <Text style={styles.menuItemChevron}>›</Text>
                 </Pressable>
               ))}
@@ -233,7 +257,7 @@ export default function DashboardScreen() {
                   setMenuVisible(false);
                   handleLogout();
                 }}>
-                <Text style={styles.menuLogoutText}>Cerrar sesión</Text>
+                <Text style={styles.menuLogoutText}>{t('menuLogout')}</Text>
               </Pressable>
             </ScrollView>
           </SafeAreaView>
@@ -243,50 +267,60 @@ export default function DashboardScreen() {
           {loading && !refreshing ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color="#4EC920" />
-              <Text style={styles.loadingText}>Cargando tu resumen...</Text>
+              <Text style={styles.loadingText}>{t('dashLoading')}</Text>
             </View>
           ) : error ? (
             <View style={styles.errorBox}>
-              <Text style={styles.errorTitle}>No se pudo cargar</Text>
+              <Text style={[styles.errorTitle, isDark && darkStyles.cardTitle]}>
+                {t('loadErrorTitle')}
+              </Text>
               <Text style={styles.errorText}>{error}</Text>
               <Pressable onPress={() => fetchData()} style={styles.retryBtn}>
-                <Text style={styles.retryText}>Reintentar</Text>
+                <Text style={styles.retryText}>{t('retry')}</Text>
               </Pressable>
             </View>
           ) : (
             <>
               {/* Stat cards flotantes */}
-              <View style={styles.floatingCard}>
-                <Text style={styles.floatingCardTitle}>Resumen de hoy</Text>
+              <View style={[styles.floatingCard, isDark && darkStyles.card]}>
+                <Text style={[styles.floatingCardTitle, isDark && darkStyles.cardTitle]}>
+                  {t('dashSummaryTitle')}
+                </Text>
                 <View style={styles.statsGrid}>
                   <StatCard
-                    label="Balance"
+                    label={t('statBalance')}
                     value={String(summary?.balance_score ?? '0')}
-                    unit="pts"
+                    unit={t('statBalanceUnit')}
                     accent
+                    isDark={isDark}
                   />
                   <StatCard
-                    label="Actividades"
+                    label={t('statActividades')}
                     value={String(summary?.actividades_completadas ?? '0')}
-                    unit="hoy"
+                    unit={t('statActividadesUnit')}
+                    isDark={isDark}
                   />
                   <StatCard
-                    label="Racha"
+                    label={t('statRacha')}
                     value={String(summary?.racha_dias ?? '0')}
-                    unit="dias"
+                    unit={t('statRachaUnit')}
+                    isDark={isDark}
                   />
                   <StatCard
-                    label="Meta semanal"
+                    label={t('statMeta')}
                     value={`${summary?.meta_semanal_pct ?? '0'}%`}
+                    isDark={isDark}
                   />
                 </View>
               </View>
 
               {/* Progress bar */}
-              <Text style={styles.sectionTitle}>Progreso semanal</Text>
-              <View style={styles.card}>
+              <Text style={[styles.sectionTitle, isDark && darkStyles.cardTitle]}>
+                {t('weeklyProgressTitle')}
+              </Text>
+              <View style={[styles.card, isDark && darkStyles.card]}>
                 <View style={styles.progressHeader}>
-                  <Text style={styles.progressLabel}>Completado esta semana</Text>
+                  <Text style={styles.progressLabel}>{t('weeklyProgressLabel')}</Text>
                   <Text style={styles.progressPct}>{pct}%</Text>
                 </View>
                 <View style={styles.progressTrack}>
@@ -294,18 +328,20 @@ export default function DashboardScreen() {
                 </View>
                 <Text style={styles.progressSub}>
                   {pct >= 100
-                    ? 'Meta alcanzada. Excelente semana.'
+                    ? t('weeklyProgressDone')
                     : pct >= 50
-                    ? 'Vas muy bien, sigue asi.'
-                    : 'Aun hay tiempo para alcanzar tu meta.'}
+                    ? t('weeklyProgressGood')
+                    : t('weeklyProgressPending')}
                 </Text>
               </View>
 
               {/* Recent activity */}
-              <Text style={styles.sectionTitle}>Actividad reciente</Text>
-              <View style={styles.card}>
+              <Text style={[styles.sectionTitle, isDark && darkStyles.cardTitle]}>
+                {t('recentActivityTitle')}
+              </Text>
+              <View style={[styles.card, isDark && darkStyles.card]}>
                 {activity.length === 0 ? (
-                  <Text style={styles.emptyText}>Sin actividad registrada aun.</Text>
+                  <Text style={styles.emptyText}>{t('noActivity')}</Text>
                 ) : (
                   activity.map((item, idx) => (
                     <View
@@ -313,8 +349,10 @@ export default function DashboardScreen() {
                       style={[styles.activityRow, idx < activity.length - 1 && styles.activityDivider]}>
                       <View style={[styles.dot, item.completada && styles.dotDone]} />
                       <View style={styles.activityInfo}>
-                        <Text style={styles.activityTitle}>{item.titulo}</Text>
-                        <Text style={styles.activityTime}>{formatRelative(item.fecha)}</Text>
+                        <Text style={[styles.activityTitle, isDark && darkStyles.cardTitle]}>
+                          {item.titulo}
+                        </Text>
+                        <Text style={styles.activityTime}>{formatRelative(item.fecha, t)}</Text>
                       </View>
                       {item.completada && (
                         <View style={styles.badge}>
@@ -502,7 +540,11 @@ const styles = StyleSheet.create({
 
   /* Hamburger menu */
   menuOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   menuPanel: {
@@ -817,5 +859,38 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '700',
+  },
+});
+
+/* Overrides para modo oscuro */
+const darkStyles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: '#121212',
+  },
+  scrollOuter: {
+    backgroundColor: '#121212',
+  },
+  card: {
+    backgroundColor: '#1e1e1e',
+    borderColor: '#2a2a2a',
+  },
+  cardTitle: {
+    color: '#f2f2f2',
+  },
+  statCard: {
+    backgroundColor: '#1e1e1e',
+    borderColor: '#2a2a2a',
+  },
+  statValue: {
+    color: '#f2f2f2',
+  },
+  menuPanel: {
+    backgroundColor: '#1e1e1e',
+  },
+  menuItem: {
+    borderBottomColor: '#2a2a2a',
+  },
+  menuItemText: {
+    color: '#f2f2f2',
   },
 });

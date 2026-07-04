@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { getUser, ordenesApi } from '@/services/api';
 import { clearCart, getCartCount, getCartTotal, removeFromCart, setQuantity, useCart } from '@/services/cart';
+import { useAppPreferences } from '@/context/app-preferences';
 
 function formatPrecio(precio: number) {
   return `$${precio.toFixed(2)}`;
@@ -31,6 +32,7 @@ function BasketIcon() {
 }
 
 export default function CarritoScreen() {
+  const { isDark, t } = useAppPreferences();
   const user = getUser();
   const items = useCart();
   const total = getCartTotal(items);
@@ -42,11 +44,11 @@ export default function CarritoScreen() {
 
   async function handleConfirmar() {
     if (!user) {
-      Alert.alert('Error', 'Debes iniciar sesión para confirmar tu pedido.');
+      Alert.alert(t('errorTitle'), t('carritoLoginRequired'));
       return;
     }
     if (!telefono.trim()) {
-      Alert.alert('Teléfono requerido', 'Ingresa un teléfono de contacto para el pedido.');
+      Alert.alert(t('telefonoRequeridoTitle'), t('telefonoRequeridoMsg'));
       return;
     }
     setPlacing(true);
@@ -65,22 +67,22 @@ export default function CarritoScreen() {
       });
       clearCart();
       Alert.alert(
-        'Pedido confirmado',
-        `Tu pedido ${res.orden.codigo_unico} fue registrado correctamente.`,
-        [{ text: 'Aceptar', onPress: () => router.replace('/(tabs)') }]
+        t('pedidoConfirmadoTitle'),
+        t('pedidoConfirmadoMsg', { codigo: res.orden.codigo_unico }),
+        [{ text: t('aceptar'), onPress: () => router.replace('/(tabs)') }]
       );
     } catch (err: unknown) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'No se pudo confirmar el pedido.');
+      Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('pedidoError'));
     } finally {
       setPlacing(false);
     }
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, isDark && darkStyles.safeArea]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.kav}>
         <ScrollView
-          contentContainerStyle={styles.scrollOuter}
+          contentContainerStyle={[styles.scrollOuter, isDark && darkStyles.scrollOuter]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
 
@@ -95,34 +97,40 @@ export default function CarritoScreen() {
             <Pressable
               style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
               onPress={() => router.back()}>
-              <Text style={styles.backBtnText}>← Volver</Text>
+              <Text style={styles.backBtnText}>{t('backVolver')}</Text>
             </Pressable>
 
             <View style={styles.headerTitleRow}>
               <BasketIcon />
-              <Text style={styles.title}>Mi Carrito</Text>
+              <Text style={styles.title}>{t('carritoTitle')}</Text>
             </View>
             <Text style={styles.subtitle}>
-              {count === 0 ? 'Tu carrito está vacío' : `${count} ${count === 1 ? 'articulo' : 'articulos'} · ${formatPrecio(total)}`}
+              {count === 0
+                ? t('carritoEmptySubtitle')
+                : t('carritoItemsSubtitle', {
+                    count,
+                    items: count === 1 ? t('carritoItemSingular') : t('carritoItemPlural'),
+                    total: formatPrecio(total),
+                  })}
             </Text>
           </LinearGradient>
 
           <View style={styles.content}>
             {items.length === 0 ? (
-              <View style={styles.floatingCard}>
-                <Text style={styles.emptyTitle}>Aún no agregaste productos</Text>
-                <Text style={styles.emptyText}>
-                  Explora el catálogo y agrega suplementos a tu carrito.
+              <View style={[styles.floatingCard, isDark && darkStyles.card]}>
+                <Text style={[styles.emptyTitle, isDark && darkStyles.cardTitle]}>
+                  {t('carritoEmptyTitle')}
                 </Text>
+                <Text style={styles.emptyText}>{t('carritoEmptyDesc')}</Text>
                 <Pressable
                   style={({ pressed }) => [styles.emptyBtn, pressed && styles.pressed]}
                   onPress={() => router.push('/productos')}>
-                  <Text style={styles.emptyBtnText}>Ver productos</Text>
+                  <Text style={styles.emptyBtnText}>{t('verProductos')}</Text>
                 </Pressable>
               </View>
             ) : (
               <>
-                <View style={styles.floatingCard}>
+                <View style={[styles.floatingCard, isDark && darkStyles.card]}>
                   {items.map((item, idx) => (
                     <View
                       key={item.suplementoId}
@@ -167,40 +175,42 @@ export default function CarritoScreen() {
                   <Pressable
                     style={({ pressed }) => [styles.clearBtn, pressed && styles.pressed]}
                     onPress={clearCart}>
-                    <Text style={styles.clearBtnText}>Vaciar carrito</Text>
+                    <Text style={styles.clearBtnText}>{t('vaciarCarrito')}</Text>
                   </Pressable>
                 </View>
 
-                <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Datos de contacto</Text>
+                <View style={[styles.card, isDark && darkStyles.card]}>
+                  <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                    {t('datosContacto')}
+                  </Text>
 
                   <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>Teléfono</Text>
+                    <Text style={styles.label}>{t('phone')}</Text>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, isDark && darkStyles.input]}
                       value={telefono}
                       onChangeText={setTelefono}
-                      placeholder="Tu teléfono"
+                      placeholder={t('phone')}
                       placeholderTextColor="#b0c8a0"
                       keyboardType="phone-pad"
                     />
                   </View>
 
                   <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>Notas (opcional)</Text>
+                    <Text style={styles.label}>{t('notasOpcional')}</Text>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, isDark && darkStyles.input]}
                       value={notas}
                       onChangeText={setNotas}
-                      placeholder="Ej. dejar con el portero"
+                      placeholder={t('notasPlaceholder')}
                       placeholderTextColor="#b0c8a0"
                     />
                   </View>
                 </View>
 
-                <View style={styles.summaryCard}>
+                <View style={[styles.summaryCard, isDark && darkStyles.card]}>
                   <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Total a pagar</Text>
+                    <Text style={styles.summaryLabel}>{t('totalPagar')}</Text>
                     <Text style={styles.summaryTotal}>{formatPrecio(total)}</Text>
                   </View>
                   <Pressable
@@ -210,7 +220,7 @@ export default function CarritoScreen() {
                     {placing ? (
                       <ActivityIndicator color="#ffffff" />
                     ) : (
-                      <Text style={styles.confirmBtnText}>Confirmar pedido</Text>
+                      <Text style={styles.confirmBtnText}>{t('confirmarPedido')}</Text>
                     )}
                   </Pressable>
                 </View>
@@ -540,5 +550,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.4,
+  },
+});
+
+const darkStyles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: '#121212',
+  },
+  scrollOuter: {
+    backgroundColor: '#121212',
+  },
+  card: {
+    backgroundColor: '#1e1e1e',
+    borderColor: '#2a2a2a',
+  },
+  cardTitle: {
+    color: '#f2f2f2',
+  },
+  input: {
+    backgroundColor: '#262626',
+    borderColor: '#3a4a33',
+    color: '#f2f2f2',
   },
 });

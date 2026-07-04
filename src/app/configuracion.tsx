@@ -7,6 +7,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -15,8 +16,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { getUser, userApi, UserProfile } from '@/services/api';
+import { useAppPreferences } from '@/context/app-preferences';
 
 export default function ConfiguracionScreen() {
+  const { isDark, toggleScheme, language, toggleLanguage, t } = useAppPreferences();
   const currentUser = getUser();
   const [profile, setProfile] = useState<UserProfile | null>(currentUser);
   const [loading, setLoading] = useState(true);
@@ -35,7 +38,7 @@ export default function ConfiguracionScreen() {
       const data = await userApi.getProfile(currentUser.id);
       setProfile(data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error al cargar la configuración');
+      setError(err instanceof Error ? err.message : t('loadErrorFallback'));
     } finally {
       setLoading(false);
     }
@@ -49,11 +52,11 @@ export default function ConfiguracionScreen() {
 
   async function handleChangePassword() {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Campos requeridos', 'Completa los tres campos de contraseña.');
+      Alert.alert(t('requiredFieldsTitle'), t('requiredFieldsMsg'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'La nueva contraseña y su confirmación no coinciden.');
+      Alert.alert(t('errorTitle'), t('passwordMismatch'));
       return;
     }
     setSavingPassword(true);
@@ -62,21 +65,21 @@ export default function ConfiguracionScreen() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      Alert.alert('Éxito', 'Contraseña actualizada correctamente.');
+      Alert.alert(t('successTitle'), t('passwordUpdated'));
     } catch (err: unknown) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'No se pudo cambiar la contraseña.');
+      Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('passwordUpdateError'));
     } finally {
       setSavingPassword(false);
     }
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, isDark && darkStyles.safeArea]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.kav}>
         <ScrollView
-          contentContainerStyle={styles.scrollOuter}
+          contentContainerStyle={[styles.scrollOuter, isDark && darkStyles.scrollOuter]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
 
@@ -91,7 +94,7 @@ export default function ConfiguracionScreen() {
             <Pressable
               style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
               onPress={() => router.back()}>
-              <Text style={styles.backBtnText}>← Volver</Text>
+              <Text style={styles.backBtnText}>{t('back')}</Text>
             </Pressable>
 
             <View style={styles.headerUserRow}>
@@ -101,61 +104,115 @@ export default function ConfiguracionScreen() {
                 </Text>
               </View>
               <View style={styles.headerUserInfo}>
-                <Text style={styles.title}>Configuración</Text>
-                <Text style={styles.subtitle}>{profile?.nombre ?? 'Datos de tu cuenta y seguridad'}</Text>
+                <Text style={styles.title}>{t('settingsTitle')}</Text>
+                <Text style={styles.subtitle}>{profile?.nombre ?? t('settingsSubtitle')}</Text>
               </View>
             </View>
           </LinearGradient>
 
           <View style={styles.content}>
 
+            {/* Preferencias: tema e idioma */}
+            <View style={[styles.floatingCard, isDark && darkStyles.card]}>
+              <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                {t('preferencesTitle')}
+              </Text>
+              <Text style={[styles.cardSubtitle, isDark && darkStyles.cardSubtitle]}>
+                {t('preferencesSubtitle')}
+              </Text>
+
+              <View style={[styles.settingRow, isDark && darkStyles.settingRow]}>
+                <View style={styles.settingTextWrap}>
+                  <Text style={[styles.settingLabel, isDark && darkStyles.settingLabel]}>
+                    {t('changeTheme')}
+                  </Text>
+                  <Text style={[styles.settingValue, isDark && darkStyles.settingValue]}>
+                    {isDark ? t('darkMode') : t('lightMode')}
+                  </Text>
+                </View>
+                <Switch
+                  value={isDark}
+                  onValueChange={toggleScheme}
+                  trackColor={{ false: '#d4edbc', true: '#2E7D32' }}
+                  thumbColor="#ffffff"
+                />
+              </View>
+
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextWrap}>
+                  <Text style={[styles.settingLabel, isDark && darkStyles.settingLabel]}>
+                    {t('changeLanguage')}
+                  </Text>
+                  <Text style={[styles.settingValue, isDark && darkStyles.settingValue]}>
+                    {language === 'es' ? t('spanish') : t('english')}
+                  </Text>
+                </View>
+                <Switch
+                  value={language === 'en'}
+                  onValueChange={toggleLanguage}
+                  trackColor={{ false: '#d4edbc', true: '#2E7D32' }}
+                  thumbColor="#ffffff"
+                />
+              </View>
+            </View>
+
             {loading ? (
               <View style={styles.loadingBox}>
                 <ActivityIndicator size="large" color="#4EC920" />
-                <Text style={styles.loadingText}>Cargando cuenta...</Text>
+                <Text style={styles.loadingText}>{t('loadingAccount')}</Text>
               </View>
             ) : error ? (
               <View style={styles.errorBox}>
-                <Text style={styles.errorTitle}>No se pudo cargar</Text>
+                <Text style={styles.errorTitle}>{t('loadErrorTitle')}</Text>
                 <Text style={styles.errorText}>{error}</Text>
                 <Pressable onPress={fetchProfile} style={styles.retryBtn}>
-                  <Text style={styles.retryText}>Reintentar</Text>
+                  <Text style={styles.retryText}>{t('retry')}</Text>
                 </Pressable>
               </View>
             ) : (
               <>
-                <View style={styles.floatingCard}>
-                  <Text style={styles.cardTitle}>Cuenta</Text>
+                <View style={[styles.card, isDark && darkStyles.card]}>
+                  <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                    {t('accountTitle')}
+                  </Text>
 
                   <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>Correo electrónico</Text>
-                    <View style={styles.readonlyBox}>
-                      <Text style={styles.readonlyText}>{profile?.correo ?? '—'}</Text>
+                    <Text style={styles.label}>{t('email')}</Text>
+                    <View style={[styles.readonlyBox, isDark && darkStyles.readonlyBox]}>
+                      <Text style={[styles.readonlyText, isDark && darkStyles.readonlyText]}>
+                        {profile?.correo ?? '—'}
+                      </Text>
                     </View>
                   </View>
 
                   <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>Tipo de cuenta</Text>
-                    <View style={styles.readonlyBox}>
-                      <Text style={styles.readonlyText}>{profile?.tipo_cuenta ?? '—'}</Text>
+                    <Text style={styles.label}>{t('accountType')}</Text>
+                    <View style={[styles.readonlyBox, isDark && darkStyles.readonlyBox]}>
+                      <Text style={[styles.readonlyText, isDark && darkStyles.readonlyText]}>
+                        {profile?.tipo_cuenta ?? '—'}
+                      </Text>
                     </View>
                   </View>
 
                   <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>Teléfono</Text>
-                    <View style={styles.readonlyBox}>
-                      <Text style={styles.readonlyText}>{profile?.telefono || '—'}</Text>
+                    <Text style={styles.label}>{t('phone')}</Text>
+                    <View style={[styles.readonlyBox, isDark && darkStyles.readonlyBox]}>
+                      <Text style={[styles.readonlyText, isDark && darkStyles.readonlyText]}>
+                        {profile?.telefono || '—'}
+                      </Text>
                     </View>
                   </View>
                 </View>
 
-                <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Cambiar contraseña</Text>
+                <View style={[styles.card, isDark && darkStyles.card]}>
+                  <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                    {t('changePasswordTitle')}
+                  </Text>
 
                   <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>Contraseña actual</Text>
+                    <Text style={styles.label}>{t('currentPassword')}</Text>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, isDark && darkStyles.input]}
                       value={currentPassword}
                       onChangeText={setCurrentPassword}
                       secureTextEntry
@@ -165,25 +222,25 @@ export default function ConfiguracionScreen() {
                   </View>
 
                   <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>Nueva contraseña</Text>
+                    <Text style={styles.label}>{t('newPassword')}</Text>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, isDark && darkStyles.input]}
                       value={newPassword}
                       onChangeText={setNewPassword}
                       secureTextEntry
-                      placeholder="Mínimo 6 caracteres"
+                      placeholder={t('newPasswordPlaceholder')}
                       placeholderTextColor="#b0c8a0"
                     />
                   </View>
 
                   <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>Confirmar nueva contraseña</Text>
+                    <Text style={styles.label}>{t('confirmPassword')}</Text>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, isDark && darkStyles.input]}
                       value={confirmPassword}
                       onChangeText={setConfirmPassword}
                       secureTextEntry
-                      placeholder="Repite la contraseña"
+                      placeholder={t('confirmPasswordPlaceholder')}
                       placeholderTextColor="#b0c8a0"
                     />
                   </View>
@@ -193,7 +250,7 @@ export default function ConfiguracionScreen() {
                     onPress={handleChangePassword}
                     disabled={savingPassword}>
                     <Text style={styles.saveButtonText}>
-                      {savingPassword ? 'Guardando...' : 'Actualizar contraseña'}
+                      {savingPassword ? t('saving') : t('updatePassword')}
                     </Text>
                   </Pressable>
                 </View>
@@ -331,6 +388,33 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 2,
   },
+  cardSubtitle: {
+    color: '#888',
+    fontSize: 13,
+    marginTop: -8,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  settingTextWrap: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  settingLabel: {
+    color: '#1a2e1a',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  settingValue: {
+    color: '#888',
+    fontSize: 12,
+    marginTop: 2,
+  },
   fieldGroup: {
     gap: 5,
   },
@@ -417,5 +501,46 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '700',
+  },
+});
+
+/* Overrides para modo oscuro */
+const darkStyles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: '#121212',
+  },
+  scrollOuter: {
+    backgroundColor: '#121212',
+  },
+  card: {
+    backgroundColor: '#1e1e1e',
+    borderColor: '#2a2a2a',
+  },
+  cardTitle: {
+    color: '#f2f2f2',
+  },
+  cardSubtitle: {
+    color: '#9a9a9a',
+  },
+  settingRow: {
+    borderTopColor: '#2a2a2a',
+  },
+  settingLabel: {
+    color: '#f2f2f2',
+  },
+  settingValue: {
+    color: '#9a9a9a',
+  },
+  readonlyBox: {
+    backgroundColor: '#262626',
+    borderColor: '#333',
+  },
+  readonlyText: {
+    color: '#bbb',
+  },
+  input: {
+    backgroundColor: '#262626',
+    borderColor: '#3a4a33',
+    color: '#f2f2f2',
   },
 });

@@ -16,14 +16,47 @@ export function clearToken() {
   _token = null;
 }
 
+export type Direccion = {
+  id: number | string;
+  calle: string;
+  numero_exterior: string;
+  numero_interior?: string | null;
+  colonia: string;
+  ciudad: string;
+  estado: string;
+  codigo_postal: string;
+  referencias?: string | null;
+  tipo?: string;
+  predeterminada?: boolean;
+  activa?: boolean;
+  direccion_completa?: string;
+};
+
+export type Tarjeta = {
+  id: number | string;
+  nombre_titular: string;
+  numero_enmascarado: string;
+  mes_expiracion: string;
+  anio_expiracion: string;
+  tipo_tarjeta: string;
+  predeterminada?: boolean;
+};
+
 export type UserProfile = {
   id: number;
   nombre: string;
   correo: string;
   rol: number;
+  rol_texto?: string;
   telefono: string;
   tipo_cuenta: string;
   edad: number;
+  sexo?: string | null;
+  fecha_registro?: string;
+  direcciones?: Direccion[];
+  total_direcciones?: number;
+  tarjetas?: Tarjeta[];
+  total_tarjetas?: number;
 };
 
 let _user: UserProfile | null = null;
@@ -99,7 +132,9 @@ export const auth = {
 
 export type UpdateProfilePayload = {
   nombre?: string;
+  correo?: string;
   telefono?: string;
+  sexo?: string;
   edad?: number;
 };
 
@@ -107,8 +142,8 @@ export const userApi = {
   getProfile: (id: number) =>
     request<UserProfile>(`/user/profile/${id}`),
 
-  updateProfile: (id: number, payload: UpdateProfilePayload) =>
-    request<UserProfile>(`/user/${id}`, {
+  updateProfile: (_id: number, payload: UpdateProfilePayload) =>
+    request<UserProfile>('/user/update', {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
@@ -120,6 +155,57 @@ export const userApi = {
         current_password: currentPassword,
         new_password: newPassword,
       }),
+    }),
+};
+
+export type AddDireccionPayload = {
+  calle: string;
+  numero_exterior: string;
+  numero_interior?: string;
+  colonia: string;
+  ciudad: string;
+  estado: string;
+  codigo_postal: string;
+  referencias?: string;
+  tipo?: string;
+  predeterminada?: boolean;
+};
+
+export const direccionesApi = {
+  getMine: () => request<Direccion[]>('/direcciones/me/direcciones'),
+
+  add: (payload: AddDireccionPayload) =>
+    request<Direccion>('/direcciones/me/add_direccion', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  remove: (direccionId: number | string) =>
+    request<{ msg: string }>(`/direcciones/${direccionId}`, {
+      method: 'DELETE',
+    }),
+};
+
+export type AddTarjetaPayload = {
+  nombre_titular: string;
+  numero_tarjeta: string;
+  mes_expiracion: string;
+  anio_expiracion: string;
+  predeterminada?: boolean;
+};
+
+export const tarjetasApi = {
+  getMine: () => request<Tarjeta[]>('/tarjetas/me'),
+
+  add: (userId: number, payload: AddTarjetaPayload) =>
+    request<Tarjeta>(`/tarjetas/user/${userId}`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  remove: (tarjetaId: number | string) =>
+    request<{ msg: string }>(`/tarjetas/${tarjetaId}`, {
+      method: 'DELETE',
     }),
 };
 
@@ -163,11 +249,79 @@ type DietasResponse = {
   total: number;
 };
 
+export type PerfilDieta = {
+  nombre?: string;
+  edad: number;
+  peso: number;
+  altura: number;
+  objetivo: string;
+  nivelActividad: string;
+  comidasPorDia: number;
+  restricciones?: string[];
+  enfermedades?: string[];
+  alergias?: string[];
+  noGusta?: string[];
+};
+
+export type ComidaItem = {
+  nombre: string;
+  cantidad: string;
+  preparacion: string;
+  calorias: number;
+};
+
+export type ComidaPlan = {
+  id: number;
+  tipo: string;
+  hora: string;
+  completado: boolean;
+  calorias: number;
+  items: ComidaItem[];
+};
+
+export type DiaPlan = {
+  dia: number;
+  fecha: string;
+  fecha_formateada: string;
+  completado: boolean;
+  calorias_dia: number;
+  comidas: ComidaPlan[];
+};
+
+export type PlanGenerado = {
+  perfil: PerfilDieta;
+  calorias_diarias: number;
+  fecha_inicio: string;
+  dias: DiaPlan[];
+};
+
+export type CrearDietaUsuarioPayload = {
+  nombre: string;
+  plan_generado: PlanGenerado;
+  perfil_usuario?: PerfilDieta;
+  descripcion?: string;
+  mantener_anterior?: boolean;
+};
+
 export const dietasApi = {
   getAll: async () => {
     const res = await request<DietasResponse>('/dietas/');
     return res.data;
   },
+
+  generarPlan: async (perfil: PerfilDieta) => {
+    const res = await request<{ success: boolean; data: PlanGenerado }>('/dietas/generar-plan', {
+      method: 'POST',
+      body: JSON.stringify({ perfil }),
+    });
+    return res.data;
+  },
+
+  crearDietaUsuario: (payload: CrearDietaUsuarioPayload) =>
+    request<{ success: boolean; msg: string; id: number }>('/dietas/usuario', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };
 
 export type DashboardSummary = {

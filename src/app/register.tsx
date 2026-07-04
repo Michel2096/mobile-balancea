@@ -14,8 +14,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { auth } from '@/services/api';
+import { useAppPreferences } from '@/context/app-preferences';
 
 export default function RegisterScreen() {
+  const { t } = useAppPreferences();
   const [form, setForm] = useState({
     nombre: '',
     apellidoMaterno: '',
@@ -50,12 +52,12 @@ export default function RegisterScreen() {
 
             {/* Card */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Registrate</Text>
+              <Text style={styles.cardTitle}>{t('registerTitle')}</Text>
 
               {/* Fila 1 */}
               <View style={styles.row}>
                 <View style={styles.fieldHalf}>
-                  <Text style={styles.label}>Nombre (s)</Text>
+                  <Text style={styles.label}>{t('firstName')}</Text>
                   <TextInput
                     style={styles.input}
                     value={form.nombre}
@@ -64,7 +66,7 @@ export default function RegisterScreen() {
                   />
                 </View>
                 <View style={styles.fieldHalf}>
-                  <Text style={styles.label}>Apellido Materno</Text>
+                  <Text style={styles.label}>{t('lastNameMaternal')}</Text>
                   <TextInput
                     style={styles.input}
                     value={form.apellidoMaterno}
@@ -77,7 +79,7 @@ export default function RegisterScreen() {
               {/* Fila 2 */}
               <View style={styles.row}>
                 <View style={styles.fieldHalf}>
-                  <Text style={styles.label}>Apellido Paterno</Text>
+                  <Text style={styles.label}>{t('lastNamePaternal')}</Text>
                   <TextInput
                     style={styles.input}
                     value={form.apellidoPaterno}
@@ -86,7 +88,7 @@ export default function RegisterScreen() {
                   />
                 </View>
                 <View style={styles.fieldHalf}>
-                  <Text style={styles.label}>Edad</Text>
+                  <Text style={styles.label}>{t('age')}</Text>
                   <TextInput
                     style={styles.input}
                     value={form.edad}
@@ -99,7 +101,7 @@ export default function RegisterScreen() {
               {/* Fila 3 */}
               <View style={styles.row}>
                 <View style={styles.fieldHalf}>
-                  <Text style={styles.label}>Correo</Text>
+                  <Text style={styles.label}>{t('emailShort')}</Text>
                   <TextInput
                     style={styles.input}
                     value={form.correo}
@@ -110,7 +112,7 @@ export default function RegisterScreen() {
                   />
                 </View>
                 <View style={styles.fieldHalf}>
-                  <Text style={styles.label}>Contraseña</Text>
+                  <Text style={styles.label}>{t('passwordLabel')}</Text>
                   <TextInput
                     style={styles.input}
                     value={form.contrasena}
@@ -123,7 +125,7 @@ export default function RegisterScreen() {
               {/* Fila 4 */}
               <View style={styles.row}>
                 <View style={styles.fieldHalf}>
-                  <Text style={styles.label}>Telefono</Text>
+                  <Text style={styles.label}>{t('phoneShort')}</Text>
                   <TextInput
                     style={styles.input}
                     value={form.telefono}
@@ -132,7 +134,7 @@ export default function RegisterScreen() {
                   />
                 </View>
                 <View style={styles.fieldHalf}>
-                  <Text style={styles.label}>Confirma contraseña</Text>
+                  <Text style={styles.label}>{t('confirmPasswordShort')}</Text>
                   <TextInput
                     style={styles.input}
                     value={form.confirmarContrasena}
@@ -147,9 +149,7 @@ export default function RegisterScreen() {
                 style={styles.termsRow}
                 onPress={() => setAceptaTerminos((v) => !v)}>
                 <View style={[styles.checkbox, aceptaTerminos && styles.checkboxChecked]} />
-                <Text style={styles.termsText}>
-                  Lei los terminos de privacidad y las condiciones de uso del sistema
-                </Text>
+                <Text style={styles.termsText}>{t('termsText')}</Text>
               </Pressable>
 
               {/* Botón */}
@@ -158,15 +158,15 @@ export default function RegisterScreen() {
                 disabled={loading}
                 onPress={async () => {
                   if (!form.nombre || !form.correo || !form.contrasena || !form.telefono) {
-                    Alert.alert('Campos requeridos', 'Nombre, correo, teléfono y contraseña son obligatorios.');
+                    Alert.alert(t('requiredFieldsTitle'), t('registerRequiredMsg'));
                     return;
                   }
                   if (form.contrasena !== form.confirmarContrasena) {
-                    Alert.alert('Error', 'Las contraseñas no coinciden.');
+                    Alert.alert(t('errorTitle'), t('registerPasswordMismatch'));
                     return;
                   }
                   if (!aceptaTerminos) {
-                    Alert.alert('Términos', 'Debes aceptar los términos y condiciones.');
+                    Alert.alert(t('termsTitle'), t('termsRequiredMsg'));
                     return;
                   }
                   setLoading(true);
@@ -183,18 +183,20 @@ export default function RegisterScreen() {
                     });
                     router.replace('/register-success');
                   } catch (err: unknown) {
-                    Alert.alert('Error', err instanceof Error ? err.message : 'No se pudo crear la cuenta.');
+                    Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('registerError'));
                   } finally {
                     setLoading(false);
                   }
                 }}>
-                <Text style={styles.registerButtonText}>{loading ? 'Creando cuenta...' : 'Registrarme'}</Text>
+                <Text style={styles.registerButtonText}>
+                  {loading ? t('creatingAccount') : t('registerSubmit')}
+                </Text>
               </Pressable>
             </View>
 
             {/* Volver */}
             <Pressable onPress={() => router.back()} style={styles.backLink}>
-              <Text style={styles.backLinkText}>{'< Regresar a inicio'}</Text>
+              <Text style={styles.backLinkText}>{t('backToHomeArrow')}</Text>
             </Pressable>
 
           </ScrollView>

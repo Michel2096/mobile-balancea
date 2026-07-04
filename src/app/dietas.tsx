@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { dietasApi, Dieta } from '@/services/api';
+import { useAppPreferences } from '@/context/app-preferences';
 
 const CHIP_PALETTE = [
   { bg: '#E8F5E9', text: '#2E7D32' },
@@ -46,7 +47,17 @@ function PlateIcon() {
   );
 }
 
+function SparkleIcon() {
+  return (
+    <View style={styles.sparkleWrap}>
+      <View style={[styles.sparkleRay, styles.sparkleRayV]} />
+      <View style={[styles.sparkleRay, styles.sparkleRayH]} />
+    </View>
+  );
+}
+
 export default function DietasScreen() {
+  const { isDark, t } = useAppPreferences();
   const [dietas, setDietas] = useState<Dieta[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -61,7 +72,7 @@ export default function DietasScreen() {
       const data = await dietasApi.getAll();
       setDietas(data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error al cargar las dietas');
+      setError(err instanceof Error ? err.message : t('loadErrorFallback'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -100,9 +111,9 @@ export default function DietasScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, isDark && darkStyles.safeArea]}>
       <ScrollView
-        contentContainerStyle={styles.scrollOuter}
+        contentContainerStyle={[styles.scrollOuter, isDark && darkStyles.scrollOuter]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -125,31 +136,35 @@ export default function DietasScreen() {
           <Pressable
             style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
             onPress={() => router.back()}>
-            <Text style={styles.backBtnText}>← Volver</Text>
+            <Text style={styles.backBtnText}>{t('backVolver')}</Text>
           </Pressable>
 
           <View style={styles.headerTitleRow}>
             <PlateIcon />
-            <Text style={styles.title}>Dietas</Text>
+            <Text style={styles.title}>{t('menuDietas')}</Text>
           </View>
           <Text style={styles.subtitle}>
             {loading
-              ? 'Planes de alimentación disponibles'
-              : `${filtered.length} de ${dietas.length} planes · ${objetivos.length} objetivos`}
+              ? t('dietasSubtitleLoading')
+              : t('dietasSubtitleResult', {
+                  filtered: filtered.length,
+                  total: dietas.length,
+                  objetivos: objetivos.length,
+                })}
           </Text>
         </LinearGradient>
 
         <View style={styles.content}>
 
           {!loading && !error && dietas.length > 0 && (
-            <View style={styles.floatingCard}>
-              <View style={styles.searchRow}>
+            <View style={[styles.floatingCard, isDark && darkStyles.card]}>
+              <View style={[styles.searchRow, isDark && darkStyles.searchRow]}>
                 <SearchIcon />
                 <TextInput
-                  style={styles.searchInput}
+                  style={[styles.searchInput, isDark && darkStyles.searchInput]}
                   value={search}
                   onChangeText={setSearch}
-                  placeholder="Buscar dieta..."
+                  placeholder={t('searchDieta')}
                   placeholderTextColor="#a8a8a8"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -164,7 +179,7 @@ export default function DietasScreen() {
                   style={[styles.chip, !selectedObjetivo && styles.chipActive]}
                   onPress={() => setSelectedObjetivo(null)}>
                   <Text style={[styles.chipText, !selectedObjetivo && styles.chipTextActive]}>
-                    Todos
+                    {t('chipTodos')}
                   </Text>
                 </Pressable>
                 {objetivos.map((o) => {
@@ -184,26 +199,53 @@ export default function DietasScreen() {
             </View>
           )}
 
+          <Pressable
+            style={({ pressed }) => [styles.createPlanCard, pressed && styles.pressedScale]}
+            onPress={() => router.push('/nueva-dieta')}>
+            <LinearGradient
+              colors={['#66BB6A', '#2E7D32']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.createPlanGradient}>
+              <View pointerEvents="none" style={styles.createPlanBlob} />
+
+              <View style={styles.createPlanIconBadge}>
+                <SparkleIcon />
+              </View>
+
+              <View style={styles.createPlanTextWrap}>
+                <Text style={styles.createPlanTitle}>{t('crearPlanTitle')}</Text>
+                <Text style={styles.createPlanSubtitle} numberOfLines={2}>
+                  {t('crearPlanSubtitle')}
+                </Text>
+              </View>
+
+              <Text style={styles.createPlanArrow}>›</Text>
+            </LinearGradient>
+          </Pressable>
+
           {loading && !refreshing ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color="#4EC920" />
-              <Text style={styles.loadingText}>Cargando dietas...</Text>
+              <Text style={styles.loadingText}>{t('loadingDietas')}</Text>
             </View>
           ) : error ? (
             <View style={styles.errorBox}>
-              <Text style={styles.errorTitle}>No se pudo cargar</Text>
+              <Text style={[styles.errorTitle, isDark && darkStyles.cardTitle]}>
+                {t('loadErrorTitle')}
+              </Text>
               <Text style={styles.errorText}>{error}</Text>
               <Pressable onPress={() => fetchData()} style={styles.retryBtn}>
-                <Text style={styles.retryText}>Reintentar</Text>
+                <Text style={styles.retryText}>{t('retry')}</Text>
               </Pressable>
             </View>
           ) : dietas.length === 0 ? (
-            <Text style={styles.emptyText}>No hay dietas disponibles por el momento.</Text>
+            <Text style={styles.emptyText}>{t('noDietas')}</Text>
           ) : filtered.length === 0 ? (
             <View style={styles.errorBox}>
-              <Text style={styles.emptyText}>No se encontraron dietas con esos filtros.</Text>
+              <Text style={styles.emptyText}>{t('noDietasFiltro')}</Text>
               <Pressable onPress={clearFilters} style={styles.retryBtn}>
-                <Text style={styles.retryText}>Limpiar filtros</Text>
+                <Text style={styles.retryText}>{t('limpiarFiltros')}</Text>
               </Pressable>
             </View>
           ) : (
@@ -211,7 +253,9 @@ export default function DietasScreen() {
               {filtered.map((d) => {
                 const objColor = colorFor(d.objetivo);
                 return (
-                  <View key={d.id} style={[styles.card, { borderLeftColor: objColor.text }]}>
+                  <View
+                    key={d.id}
+                    style={[styles.card, isDark && darkStyles.card, { borderLeftColor: objColor.text }]}>
                     <View style={styles.cardTopRow}>
                       <View
                         style={[
@@ -223,7 +267,11 @@ export default function DietasScreen() {
                         </Text>
                       </View>
                       <View style={styles.cardTopInfo}>
-                        <Text style={styles.cardTitle} numberOfLines={1}>{d.nombre}</Text>
+                        <Text
+                          style={[styles.cardTitle, isDark && darkStyles.cardTitle]}
+                          numberOfLines={1}>
+                          {d.nombre}
+                        </Text>
                         <View style={[styles.metaChip, { backgroundColor: objColor.bg }]}>
                           <Text style={[styles.metaChipText, { color: objColor.text }]} numberOfLines={1}>
                             {d.objetivo_nombre}
@@ -239,20 +287,28 @@ export default function DietasScreen() {
                       {d.descripcion}
                     </Text>
 
-                    <View style={styles.statsRow}>
+                    <View style={[styles.statsRow, isDark && darkStyles.statsRow]}>
                       <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{d.calorias_diarias}</Text>
-                        <Text style={styles.statLabel}>kcal/dia</Text>
+                        <Text style={[styles.statValue, isDark && darkStyles.cardTitle]}>
+                          {d.calorias_diarias}
+                        </Text>
+                        <Text style={styles.statLabel}>{t('kcalDia')}</Text>
                       </View>
                       <View style={styles.statDivider} />
                       <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{d.comidas_por_dia}</Text>
-                        <Text style={styles.statLabel}>comidas/dia</Text>
+                        <Text style={[styles.statValue, isDark && darkStyles.cardTitle]}>
+                          {d.comidas_por_dia}
+                        </Text>
+                        <Text style={styles.statLabel}>{t('comidasDia')}</Text>
                       </View>
                       <View style={styles.statDivider} />
                       <View style={styles.statItem}>
-                        <Text style={styles.statValue} numberOfLines={1}>{d.nivel_actividad_nombre}</Text>
-                        <Text style={styles.statLabel}>actividad</Text>
+                        <Text
+                          style={[styles.statValue, isDark && darkStyles.cardTitle]}
+                          numberOfLines={1}>
+                          {d.nivel_actividad_nombre}
+                        </Text>
+                        <Text style={styles.statLabel}>{t('actividad')}</Text>
                       </View>
                     </View>
 
@@ -366,7 +422,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 16,
     marginTop: -40,
-    marginBottom: 18,
+    marginBottom: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
@@ -436,6 +492,89 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#ffffff',
+  },
+
+  /* CTA crear plan personalizado */
+  createPlanCard: {
+    borderRadius: 20,
+    marginTop: 28,
+    marginBottom: 16,
+    shadowColor: '#2E7D32',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  pressedScale: {
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
+  },
+  createPlanGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    overflow: 'hidden',
+  },
+  createPlanBlob: {
+    position: 'absolute',
+    top: -30,
+    right: -30,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  createPlanIconBadge: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  createPlanTextWrap: {
+    flex: 1,
+  },
+  createPlanTitle: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  createPlanSubtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  createPlanArrow: {
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: '700',
+  },
+
+  /* Icono sparkle */
+  sparkleWrap: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sparkleRay: {
+    position: 'absolute',
+    backgroundColor: '#ffffff',
+    borderRadius: 2,
+  },
+  sparkleRayV: {
+    width: 3.5,
+    height: 18,
+  },
+  sparkleRayH: {
+    width: 18,
+    height: 3.5,
   },
 
   /* Lista de dietas */
@@ -602,5 +741,31 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '700',
+  },
+});
+
+const darkStyles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: '#121212',
+  },
+  scrollOuter: {
+    backgroundColor: '#121212',
+  },
+  card: {
+    backgroundColor: '#1e1e1e',
+    borderColor: '#2a2a2a',
+  },
+  cardTitle: {
+    color: '#f2f2f2',
+  },
+  searchRow: {
+    backgroundColor: '#262626',
+    borderColor: '#333',
+  },
+  searchInput: {
+    color: '#f2f2f2',
+  },
+  statsRow: {
+    backgroundColor: '#262626',
   },
 });

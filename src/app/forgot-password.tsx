@@ -11,8 +11,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useAppPreferences } from '@/context/app-preferences';
 
 export default function ForgotPasswordScreen() {
+  const { t } = useAppPreferences();
   const [email, setEmail] = useState('');
 
   return (
@@ -29,10 +31,8 @@ export default function ForgotPasswordScreen() {
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Has olvidado tu{'\n'}contraseña</Text>
-            <Text style={styles.cardSubtitle}>
-              Introduce tu correo electronico para recibir una{'\n'}contraseña temporal
-            </Text>
+            <Text style={styles.cardTitle}>{t('forgotTitle')}</Text>
+            <Text style={styles.cardSubtitle}>{t('forgotSubtitle')}</Text>
 
             <View style={styles.inputRow}>
               <TextInput
@@ -53,7 +53,7 @@ export default function ForgotPasswordScreen() {
           </View>
 
           <Pressable onPress={() => router.back()}>
-            <Text style={styles.backLinkText}>{'< Regresar a inicio'}</Text>
+            <Text style={styles.backLinkText}>{t('backToHomeArrow')}</Text>
           </Pressable>
 
         </KeyboardAvoidingView>

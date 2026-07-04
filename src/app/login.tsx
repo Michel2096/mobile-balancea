@@ -14,19 +14,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { auth, setToken, setUser } from '@/services/api';
+import { useAppPreferences } from '@/context/app-preferences';
 
 export default function LoginScreen() {
+  const { isDark, t } = useAppPreferences();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, isDark && darkStyles.safeArea]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.kav}>
         <ScrollView
-          contentContainerStyle={styles.scrollOuter}
+          contentContainerStyle={[styles.scrollOuter, isDark && darkStyles.scrollOuter]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
 
@@ -39,18 +41,20 @@ export default function LoginScreen() {
             <View pointerEvents="none" style={styles.headerBlob} />
 
             <Text style={styles.title}>Balancea</Text>
-            <Text style={styles.subtitle}>Inicia sesión para continuar tu bienestar.</Text>
+            <Text style={styles.subtitle}>{t('loginSubtitle')}</Text>
           </LinearGradient>
 
           <View style={styles.content}>
-            <View style={styles.floatingCard}>
-              <Text style={styles.cardTitle}>Iniciar Sesión</Text>
+            <View style={[styles.floatingCard, isDark && darkStyles.card]}>
+              <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                {t('loginTitle')}
+              </Text>
               <View style={styles.divider} />
 
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Correo electrónico</Text>
+                <Text style={styles.label}>{t('email')}</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, isDark && darkStyles.input]}
                   placeholder="correo@example.com"
                   placeholderTextColor="#b0c8a0"
                   value={email}
@@ -62,9 +66,9 @@ export default function LoginScreen() {
               </View>
 
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Contraseña</Text>
+                <Text style={styles.label}>{t('passwordLabel')}</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, isDark && darkStyles.input]}
                   placeholder="••••••••"
                   placeholderTextColor="#b0c8a0"
                   secureTextEntry
@@ -74,14 +78,14 @@ export default function LoginScreen() {
               </View>
 
               <Pressable onPress={() => router.push('/forgot-password')}>
-                <Text style={styles.forgotPassword}>¿Olvidaste tu contraseña?</Text>
+                <Text style={styles.forgotPassword}>{t('forgotPasswordLink')}</Text>
               </Pressable>
 
               <Pressable
                 style={({ pressed }) => [styles.loginButton, pressed && styles.pressed, loading && styles.pressed]}
                 onPress={async () => {
                   if (!email || !password) {
-                    Alert.alert('Campos requeridos', 'Ingresa tu correo y contraseña.');
+                    Alert.alert(t('requiredFieldsTitle'), t('loginRequiredMsg'));
                     return;
                   }
                   setLoading(true);
@@ -91,24 +95,24 @@ export default function LoginScreen() {
                     setUser(res.user);
                     router.replace('/(tabs)');
                   } catch (err: unknown) {
-                    Alert.alert('Error', err instanceof Error ? err.message : 'No se pudo iniciar sesión.');
+                    Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('loginError'));
                   } finally {
                     setLoading(false);
                   }
                 }}
                 disabled={loading}>
-                <Text style={styles.loginButtonText}>{loading ? 'Ingresando...' : 'Ingresar'}</Text>
+                <Text style={styles.loginButtonText}>{loading ? t('loggingIn') : t('loginSubmit')}</Text>
               </Pressable>
 
               <Pressable onPress={() => router.push('/register')}>
-                <Text style={styles.registerLink}>¿No tienes cuenta? Regístrate</Text>
+                <Text style={styles.registerLink}>{t('noAccountLink')}</Text>
               </Pressable>
             </View>
 
             <Pressable
               style={({ pressed }) => [styles.backHomeBtn, pressed && styles.pressed]}
               onPress={() => router.push('/')}>
-              <Text style={styles.backHomeBtnText}>← Volver al inicio</Text>
+              <Text style={styles.backHomeBtnText}>{t('backToHome')}</Text>
             </Pressable>
           </View>
 
@@ -262,5 +266,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
+  },
+});
+
+const darkStyles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: '#121212',
+  },
+  scrollOuter: {
+    backgroundColor: '#121212',
+  },
+  card: {
+    backgroundColor: '#1e1e1e',
+  },
+  cardTitle: {
+    color: '#f2f2f2',
+  },
+  input: {
+    backgroundColor: '#262626',
+    borderColor: '#3a4a33',
+    color: '#f2f2f2',
   },
 });

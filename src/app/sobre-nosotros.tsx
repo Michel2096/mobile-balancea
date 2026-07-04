@@ -1,32 +1,116 @@
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Asset } from 'expo-asset';
+import * as Sharing from 'expo-sharing';
 import { router } from 'expo-router';
+import { useAppPreferences } from '@/context/app-preferences';
 
 const OFFERINGS = [
+  { titleKey: 'offer1Title', descKey: 'offer1Desc' },
+  { titleKey: 'offer2Title', descKey: 'offer2Desc' },
+  { titleKey: 'offer3Title', descKey: 'offer3Desc' },
+  { titleKey: 'offer4Title', descKey: 'offer4Desc' },
+];
+
+const VALOR_KEYS = [
+  'valorSaludIntegral',
+  'valorRespaldoProfesional',
+  'valorCompromiso',
+  'valorAccesibilidad',
+  'valorInnovacion',
+  'valorEmpatia',
+  'valorRespeto',
+  'valorDisciplina',
+];
+
+const DOCUMENTOS = [
   {
-    title: 'Seguimiento personalizado',
-    desc: 'Registra y analiza tus habitos diarios de manera sencilla.',
+    key: 'canva',
+    title: 'Canva Balancea',
+    desc: 'Presentación y diseño de nuestra marca',
+    asset: require('@/pdfs/canva-diet-lettuce.pdf'),
   },
   {
-    title: 'Progreso visible',
-    desc: 'Visualiza tu avance con estadisticas claras y motivadoras.',
+    key: 'carta-usuario',
+    title: 'Carta del Usuario',
+    desc: 'Términos y condiciones para usuarios',
+    asset: require('@/pdfs/carta-usuario.pdf'),
   },
   {
-    title: 'Comunidad de apoyo',
-    desc: 'Conecta con personas que comparten tus mismas metas.',
+    key: 'balance',
+    title: 'Balance Balancea',
+    desc: 'Presentación y diseño de nuestra marca',
+    asset: require('@/pdfs/balance-diet-lettuce.pdf'),
   },
   {
-    title: 'Privacidad garantizada',
-    desc: 'Tu informacion siempre segura y bajo tu control.',
+    key: 'foda',
+    title: 'Foda Balancea',
+    desc: 'Presentación y diseño de nuestra marca',
+    asset: require('@/pdfs/foda-diet-lettuce-completo.pdf'),
+  },
+  {
+    key: 'madurez',
+    title: 'Carta de Madurez Balancea',
+    desc: 'Próximamente disponible',
+    asset: null,
+  },
+  {
+    key: 'ficha',
+    title: 'Ficha Técnica Balancea',
+    desc: 'Presentación y diseño de nuestra marca',
+    asset: require('@/pdfs/ficha-tecnica-diet-lettuce.pdf'),
   },
 ];
 
+const EQUIPO = [
+  { key: 'jc', nombre: 'Villavicencio Gonzalez Juan Carlos', telefono: '+52 7294030702' },
+  { key: 'ac', nombre: 'Jiménez Ocampo Amanda Carolina', telefono: '+52 7292948980' },
+  { key: 'ax', nombre: 'Arzte Neri Axel', telefono: '+52 7226780112' },
+  { key: 'ma', nombre: 'Lopez Villar Miguel Angel', telefono: '+52 7226165733' },
+];
+
+async function openDocument(asset: number, dialogTitle: string) {
+  const file = Asset.fromModule(asset);
+  await file.downloadAsync();
+  if (!file.localUri) return;
+
+  const canShare = await Sharing.isAvailableAsync();
+  if (canShare) {
+    await Sharing.shareAsync(file.localUri, { mimeType: 'application/pdf', dialogTitle });
+  } else {
+    await Linking.openURL(file.localUri);
+  }
+}
+
 export default function SobreNosotrosScreen() {
+  const { isDark, t } = useAppPreferences();
+  const [loadingDoc, setLoadingDoc] = useState<string | null>(null);
+
+  async function handleDocPress(key: string, asset: number, title: string) {
+    if (loadingDoc) return;
+    setLoadingDoc(key);
+    try {
+      await openDocument(asset, title);
+    } finally {
+      setLoadingDoc(null);
+    }
+  }
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, isDark && darkStyles.safeArea]}>
       <ScrollView
-        contentContainerStyle={styles.scrollOuter}
+        contentContainerStyle={[styles.scrollOuter, isDark && darkStyles.scrollOuter]}
         showsVerticalScrollIndicator={false}>
 
         {/* Encabezado en degradado */}
@@ -41,7 +125,7 @@ export default function SobreNosotrosScreen() {
             <Pressable
               style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
               onPress={() => router.back()}>
-              <Text style={styles.backBtnText}>← Volver</Text>
+              <Text style={styles.backBtnText}>{t('backVolver')}</Text>
             </Pressable>
 
             <View style={styles.logoWrap}>
@@ -53,43 +137,91 @@ export default function SobreNosotrosScreen() {
             </View>
           </View>
 
-          <Text style={styles.title}>Sobre Nosotros</Text>
-          <Text style={styles.subtitle}>Conoce el equipo y la visión detrás de Balancea.</Text>
+          <Text style={styles.title}>{t('menuNosotros')}</Text>
+          <Text style={styles.subtitle}>{t('aboutSubtitle')}</Text>
         </LinearGradient>
 
         <View style={styles.content}>
 
-          {/* Mision, como tarjeta flotante */}
-          <View style={styles.floatingCard}>
+          {/* Quienes somos, como tarjeta flotante */}
+          <View style={[styles.floatingCard, isDark && darkStyles.card]}>
             <View style={styles.cardHeader}>
               <View style={styles.cardAccentBar} />
-              <Text style={styles.cardTitle}>Nuestra Misión</Text>
+              <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>Balancea</Text>
             </View>
-            <Text style={styles.cardText}>
-              En Balancea creemos que el bienestar es un equilibrio entre la mente, el cuerpo
-              y los habitos cotidianos. Nuestra mision es proporcionar una herramienta accesible
-              y motivadora que acompane a las personas en su camino hacia una vida mas saludable.
+            <Text style={[styles.cardText, isDark && darkStyles.cardText]}>{t('aboutIntro')}</Text>
+          </View>
+
+          {/* Mision */}
+          <View style={[styles.card, isDark && darkStyles.card]}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardAccentBar} />
+              <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                {t('misionTitle')}
+              </Text>
+            </View>
+            <Text style={[styles.cardText, isDark && darkStyles.cardText]}>{t('misionText')}</Text>
+          </View>
+
+          {/* Vision */}
+          <View style={[styles.card, isDark && darkStyles.card]}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardAccentBar} />
+              <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                {t('visionTitle')}
+              </Text>
+            </View>
+            <Text style={[styles.cardText, isDark && darkStyles.cardText]}>{t('visionText')}</Text>
+          </View>
+
+          {/* Valores */}
+          <View style={[styles.card, isDark && darkStyles.card]}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardAccentBar} />
+              <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                {t('valoresTitle')}
+              </Text>
+            </View>
+            <View style={styles.valoresGrid}>
+              {VALOR_KEYS.map((key) => (
+                <View key={key} style={styles.valorChip}>
+                  <Text style={styles.valorChipText}>{t(key)}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Objetivo */}
+          <View style={[styles.card, isDark && darkStyles.card]}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardAccentBar} />
+              <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                {t('objetivoTitle')}
+              </Text>
+            </View>
+            <Text style={[styles.cardText, isDark && darkStyles.cardText]}>
+              {t('objetivoText')}
             </Text>
           </View>
 
-          {/* Quienes somos */}
-          <View style={styles.card}>
+          {/* Meta */}
+          <View style={[styles.card, isDark && darkStyles.card]}>
             <View style={styles.cardHeader}>
               <View style={styles.cardAccentBar} />
-              <Text style={styles.cardTitle}>Quienes Somos</Text>
+              <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                {t('metaTitle')}
+              </Text>
             </View>
-            <Text style={styles.cardText}>
-              Somos un equipo apasionado por la tecnologia y el bienestar humano. Combinamos
-              experiencia en desarrollo de software con conocimientos en salud y nutricion para
-              crear una aplicacion que realmente marque la diferencia en tu dia a dia.
-            </Text>
+            <Text style={[styles.cardText, isDark && darkStyles.cardText]}>{t('metaText')}</Text>
           </View>
 
           {/* Que ofrecemos */}
-          <View style={styles.card}>
+          <View style={[styles.card, isDark && darkStyles.card]}>
             <View style={styles.cardHeader}>
               <View style={styles.cardAccentBar} />
-              <Text style={styles.cardTitle}>Que Ofrecemos</Text>
+              <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                {t('ofrecemosTitle')}
+              </Text>
             </View>
             <View style={styles.offeringsList}>
               {OFFERINGS.map((o, i) => (
@@ -98,30 +230,120 @@ export default function SobreNosotrosScreen() {
                     <Text style={styles.offeringBulletText}>{i + 1}</Text>
                   </View>
                   <View style={styles.offeringContent}>
-                    <Text style={styles.offeringTitle}>{o.title}</Text>
-                    <Text style={styles.offeringDesc}>{o.desc}</Text>
+                    <Text style={[styles.offeringTitle, isDark && darkStyles.cardTitle]}>
+                      {t(o.titleKey)}
+                    </Text>
+                    <Text style={styles.offeringDesc}>{t(o.descKey)}</Text>
                   </View>
                 </View>
               ))}
             </View>
           </View>
 
+          {/* Documentos importantes */}
+          <View style={[styles.card, isDark && darkStyles.card]}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardAccentBar} />
+              <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                {t('documentosTitle')}
+              </Text>
+            </View>
+            <View style={styles.docsList}>
+              {DOCUMENTOS.map((doc, i) => {
+                const isLoading = loadingDoc === doc.key;
+                const disabled = !doc.asset || isLoading;
+                return (
+                  <View
+                    key={doc.key}
+                    style={[styles.docRow, i < DOCUMENTOS.length - 1 && styles.docRowDivider]}>
+                    <View style={styles.docTextWrap}>
+                      <Text style={[styles.docTitle, isDark && darkStyles.cardTitle]}>
+                        {doc.title}
+                      </Text>
+                      <Text style={styles.docDesc}>{doc.desc}</Text>
+                    </View>
+                    {isLoading ? (
+                      <ActivityIndicator size="small" color="#2E7D32" />
+                    ) : (
+                      <View style={styles.docActions}>
+                        <Pressable
+                          disabled={disabled}
+                          onPress={() =>
+                            handleDocPress(doc.key, doc.asset, `${t('docVer')} ${doc.title}`)
+                          }
+                          style={({ pressed }) => [
+                            styles.docTag,
+                            !doc.asset && styles.docTagDisabled,
+                            pressed && styles.pressed,
+                          ]}>
+                          <Text style={[styles.docTagText, !doc.asset && styles.docTagTextDisabled]}>
+                            {t('docVer')}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          disabled={disabled}
+                          onPress={() =>
+                            handleDocPress(doc.key, doc.asset, `${t('docDescargar')} ${doc.title}`)
+                          }
+                          style={({ pressed }) => [
+                            styles.docTag,
+                            !doc.asset && styles.docTagDisabled,
+                            pressed && styles.pressed,
+                          ]}>
+                          <Text style={[styles.docTagText, !doc.asset && styles.docTagTextDisabled]}>
+                            {t('docDescargar')}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
           {/* Contacto */}
           <View style={[styles.card, styles.contactCard]}>
-            <Text style={styles.contactLabel}>Contactanos</Text>
-            <Text style={styles.contactPrompt}>
-              Tienes preguntas, sugerencias o comentarios? Nos encantaria escucharte.
-            </Text>
-            <View style={styles.emailPill}>
-              <Text style={styles.emailText}>soporte@balancea.app</Text>
+            <Text style={styles.contactLabel}>{t('contactoTitle')}</Text>
+            <Text style={styles.contactPrompt}>{t('contactoPrompt')}</Text>
+
+            <View style={styles.contactLocationRow}>
+              <Text style={styles.contactLocationText}>{t('ubicacion')}</Text>
             </View>
+
+            <View style={styles.teamList}>
+              {EQUIPO.map((persona) => (
+                <Pressable
+                  key={persona.key}
+                  style={({ pressed }) => [styles.teamRow, pressed && styles.pressed]}
+                  onPress={() => Linking.openURL(`tel:${persona.telefono.replace(/\s+/g, '')}`)}>
+                  <Text style={styles.teamName}>{persona.nombre}</Text>
+                  <Text style={styles.teamPhone}>{persona.telefono}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Pressable
+              style={({ pressed }) => [styles.emailPill, pressed && styles.pressed]}
+              onPress={() => Linking.openURL('mailto:dietlettuce1@gmail.com')}>
+              <Text style={styles.emailText}>dietlettuce1@gmail.com</Text>
+            </Pressable>
+          </View>
+
+          {/* Pie de marca */}
+          <View style={styles.brandFooter}>
+            <Text style={[styles.brandFooterTitle, isDark && darkStyles.cardTitle]}>Balancea</Text>
+            <Text style={styles.brandFooterTagline}>Tu decisión crea el equilibrio.</Text>
+            <Text style={styles.brandFooterCopy}>
+              © {new Date().getFullYear()} Balancea. Todos los derechos reservados.
+            </Text>
           </View>
 
           {/* CTA */}
           <Pressable
             style={({ pressed }) => [styles.loginBtn, pressed && styles.pressed]}
             onPress={() => router.push('/login')}>
-            <Text style={styles.loginBtnText}>Ir al Login</Text>
+            <Text style={styles.loginBtnText}>{t('irLogin')}</Text>
           </Pressable>
 
         </View>
@@ -298,6 +520,80 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 
+  /* Valores */
+  valoresGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  valorChip: {
+    backgroundColor: '#f0f9e8',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: '#d4edbc',
+  },
+  valorChipText: {
+    color: '#2E7D32',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  /* Documentos */
+  docsList: {
+    gap: 0,
+  },
+  docRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingVertical: 14,
+  },
+  docRowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  docTextWrap: {
+    flex: 1,
+  },
+  docTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1a2e1a',
+  },
+  docDesc: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+    lineHeight: 17,
+  },
+  docActions: {
+    flexDirection: 'row',
+    gap: 6,
+    flexShrink: 0,
+  },
+  docTag: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+  },
+  docTagText: {
+    color: '#555',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  docTagDisabled: {
+    opacity: 0.5,
+  },
+  docTagTextDisabled: {
+    color: '#aaa',
+  },
+
   /* Contact */
   contactCard: {
     backgroundColor: '#f8fdf5',
@@ -331,6 +627,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  contactLocationRow: {
+    paddingBottom: 2,
+  },
+  contactLocationText: {
+    color: '#2E7D32',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  teamList: {
+    width: '100%',
+    gap: 2,
+  },
+  teamRow: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5f3d9',
+  },
+  teamName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1a2e1a',
+    textAlign: 'center',
+  },
+  teamPhone: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#3aab14',
+    marginTop: 2,
+  },
+
+  /* Pie de marca */
+  brandFooter: {
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+  },
+  brandFooterTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1a2e1a',
+  },
+  brandFooterTagline: {
+    fontSize: 13,
+    color: '#666',
+  },
+  brandFooterCopy: {
+    fontSize: 11,
+    color: '#999',
+    marginTop: 4,
+    textAlign: 'center',
+  },
 
   /* Login CTA */
   loginBtn: {
@@ -350,5 +699,24 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: 0.4,
+  },
+});
+
+const darkStyles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: '#121212',
+  },
+  scrollOuter: {
+    backgroundColor: '#121212',
+  },
+  card: {
+    backgroundColor: '#1e1e1e',
+    borderColor: '#2a2a2a',
+  },
+  cardTitle: {
+    color: '#f2f2f2',
+  },
+  cardText: {
+    color: '#c8c8c8',
   },
 });

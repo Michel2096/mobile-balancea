@@ -3,8 +3,10 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAppPreferences } from '@/context/app-preferences';
 
 export default function RegisterSuccessScreen() {
+  const { t } = useAppPreferences();
   const scale = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -24,17 +26,15 @@ export default function RegisterSuccessScreen() {
           </Animated.View>
 
           <Animated.View style={{ opacity }}>
-            <Text style={styles.title}>¡Cuenta creada!</Text>
-            <Text style={styles.subtitle}>
-              Tu cuenta fue registrada correctamente.{'\n'}Ya puedes iniciar sesión.
-            </Text>
+            <Text style={styles.title}>{t('accountCreated')}</Text>
+            <Text style={styles.subtitle}>{t('accountCreatedSubtitle')}</Text>
           </Animated.View>
 
           <Animated.View style={{ opacity, width: '100%' }}>
             <Pressable
               style={({ pressed }) => [styles.button, pressed && styles.pressed]}
               onPress={() => router.replace('/login')}>
-              <Text style={styles.buttonText}>Iniciar sesión</Text>
+              <Text style={styles.buttonText}>{t('loginSubmit')}</Text>
             </Pressable>
           </Animated.View>
         </View>
