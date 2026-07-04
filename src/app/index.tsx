@@ -1,4 +1,5 @@
 import {
+  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -187,9 +188,24 @@ const CONTACT_ITEMS = [
 ];
 
 const SOCIALS = [
-  { key: 'facebook', label: 'Facebook', initial: 'F', color: '#1877F2' },
-  { key: 'instagram', label: 'Instagram', initial: 'I', color: '#C13584' },
-  { key: 'tiktok', label: 'TikTok', initial: 'T', color: '#111111' },
+  {
+    key: 'facebook',
+    label: 'Facebook',
+    icon: require('@/img/facebook.png'),
+    href: 'https://www.facebook.com/profile.php?id=61582244528322',
+  },
+  {
+    key: 'instagram',
+    label: 'Instagram',
+    icon: require('@/img/instagram.png'),
+    href: 'https://www.instagram.com/dietlettuce1/',
+  },
+  {
+    key: 'tiktok',
+    label: 'TikTok',
+    icon: require('@/img/tik-tok.png'),
+    href: 'https://www.tiktok.com/@dietlettuce01',
+  },
 ];
 
 /* ---------- Fondo decorativo ambiental ---------- */
@@ -405,13 +421,11 @@ export default function HomeScreen() {
             </Text>
             <Text style={styles.sectionSubtitle}>{t('findUsSubtitle')}</Text>
             <View style={styles.socialRow}>
-              {SOCIALS.map(({ key, label, initial, color }) => (
-                <View key={key} style={styles.socialItem}>
-                  <View style={[styles.socialBadge, { backgroundColor: color }]}>
-                    <Text style={styles.socialInitial}>{initial}</Text>
-                  </View>
+              {SOCIALS.map(({ key, label, icon, href }) => (
+                <Pressable key={key} style={styles.socialItem} onPress={() => Linking.openURL(href)}>
+                  <Image source={icon} style={styles.socialBadge} resizeMode="contain" />
                   <Text style={styles.socialLabel}>{label}</Text>
-                </View>
+                </Pressable>
               ))}
             </View>
           </Animated.View>
@@ -892,18 +906,11 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.15,
     shadowRadius: 6,
     elevation: 3,
-  },
-  socialInitial: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: '800',
   },
   socialLabel: {
     fontSize: 12,

@@ -130,7 +130,7 @@ export default function SobreNosotrosScreen() {
 
             <View style={styles.logoWrap}>
               <Image
-                source={require('../../assets/images/logo-glow.png')}
+                source={require('../../../assets/images/logo-glow.png')}
                 style={styles.navLogo}
                 resizeMode="contain"
               />

@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import { dietasApi, Dieta } from '@/services/api';
+import { dietasApi, Dieta, DietaUsuario } from '@/services/api';
 import { useAppPreferences } from '@/context/app-preferences';
 
 const CHIP_PALETTE = [
@@ -56,9 +56,18 @@ function SparkleIcon() {
   );
 }
 
+function formatFecha(dateStr: string | undefined) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString();
+}
+
 export default function DietasScreen() {
   const { isDark, t } = useAppPreferences();
   const [dietas, setDietas] = useState<Dieta[]>([]);
+  const [misDietas, setMisDietas] = useState<DietaUsuario[]>([]);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,8 +78,12 @@ export default function DietasScreen() {
     if (!silent) setLoading(true);
     setError(null);
     try {
-      const data = await dietasApi.getAll();
-      setDietas(data);
+      const [catalogo, misPlanes] = await Promise.all([
+        dietasApi.getAll(),
+        dietasApi.getMisDietas().catch(() => []),
+      ]);
+      setDietas(catalogo);
+      setMisDietas(misPlanes);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('loadErrorFallback'));
     } finally {
@@ -155,6 +168,100 @@ export default function DietasScreen() {
         </LinearGradient>
 
         <View style={styles.content}>
+
+          {!loading && misDietas.length > 0 && (
+            <View style={styles.misPlanesSection}>
+              <Text style={[styles.sectionTitle, isDark && darkStyles.cardTitle]}>
+                {t('misPlanesTitle')}
+              </Text>
+              <View style={styles.list}>
+                {misDietas.map((d) => {
+                  const expanded = expandedId === d.id;
+                  return (
+                    <View key={d.id} style={[styles.card, isDark && darkStyles.card, { borderLeftColor: '#2E7D32' }]}>
+                      <Pressable onPress={() => setExpandedId(expanded ? null : d.id)}>
+                        <View style={styles.cardTopRow}>
+                          <View style={[styles.iconBadge, { backgroundColor: '#E8F5E9', shadowColor: '#2E7D32' }]}>
+                            <Text style={[styles.iconBadgeText, { color: '#2E7D32' }]}>
+                              {d.nombre[0]?.toUpperCase() ?? '?'}
+                            </Text>
+                          </View>
+                          <View style={styles.cardTopInfo}>
+                            <Text
+                              style={[styles.cardTitle, isDark && darkStyles.cardTitle]}
+                              numberOfLines={1}>
+                              {d.nombre}
+                            </Text>
+                            <View
+                              style={[
+                                styles.metaChip,
+                                { backgroundColor: d.activo ? '#edfde0' : '#f0f0f0' },
+                              ]}>
+                              <Text
+                                style={[
+                                  styles.metaChipText,
+                                  { color: d.activo ? '#2E7D32' : '#888' },
+                                ]}>
+                                {d.activo ? t('planActivoBadge') : t('planInactivoBadge')}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={styles.durationBadgeText}>{d.progreso}%</Text>
+                        </View>
+
+                        <View style={styles.progresoBarBg}>
+                          <View style={[styles.progresoBarFill, { width: `${d.progreso}%` }]} />
+                        </View>
+
+                        <Text style={styles.cardDescription}>
+                          {t('planCreadoEl')} {formatFecha(d.fecha_creacion)}
+                        </Text>
+
+                        <Text style={styles.verDetallesLink}>
+                          {expanded ? t('ocultarDetalles') : t('verDetalles')}
+                        </Text>
+                      </Pressable>
+
+                      {expanded && (
+                        <View style={styles.diasList}>
+                          <View style={[styles.statsRow, isDark && darkStyles.statsRow]}>
+                            <View style={styles.statItem}>
+                              <Text style={[styles.statValue, isDark && darkStyles.cardTitle]}>
+                                {d.plan_generado.calorias_diarias}
+                              </Text>
+                              <Text style={styles.statLabel}>{t('kcalDia')}</Text>
+                            </View>
+                            <View style={styles.statDivider} />
+                            <View style={styles.statItem}>
+                              <Text style={[styles.statValue, isDark && darkStyles.cardTitle]}>
+                                {d.plan_generado.dias?.length ?? 0}
+                              </Text>
+                              <Text style={styles.statLabel}>{t('diasPlan')}</Text>
+                            </View>
+                          </View>
+                          {d.plan_generado.dias?.map((dia) => (
+                            <View key={dia.dia} style={[styles.diaCard, isDark && darkStyles.diaCard]}>
+                              <Text style={[styles.diaTitle, isDark && darkStyles.cardTitle]}>
+                                {t('diaLabel', { n: dia.dia + 1 })} · {dia.fecha_formateada}
+                              </Text>
+                              {dia.comidas.map((comida) => (
+                                <View key={comida.id} style={styles.comidaRow}>
+                                  <Text style={styles.comidaTipo}>
+                                    {comida.tipo} · {comida.hora}
+                                  </Text>
+                                  <Text style={styles.comidaCalorias}>{comida.calorias} kcal</Text>
+                                </View>
+                              ))}
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
 
           {!loading && !error && dietas.length > 0 && (
             <View style={[styles.floatingCard, isDark && darkStyles.card]}>
@@ -577,6 +684,66 @@ const styles = StyleSheet.create({
     height: 3.5,
   },
 
+  /* Mis planes */
+  misPlanesSection: {
+    marginTop: 24,
+    gap: 12,
+  },
+  sectionTitle: {
+    color: '#1a2e1a',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  progresoBarBg: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#eef0ea',
+    overflow: 'hidden',
+  },
+  progresoBarFill: {
+    height: '100%',
+    backgroundColor: '#2E7D32',
+    borderRadius: 3,
+  },
+  verDetallesLink: {
+    color: '#2E7D32',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  diasList: {
+    gap: 10,
+    marginTop: 12,
+  },
+  diaCard: {
+    backgroundColor: '#f9faf7',
+    borderRadius: 14,
+    padding: 14,
+    gap: 6,
+  },
+  diaTitle: {
+    color: '#1a2e1a',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 2,
+    textTransform: 'capitalize',
+  },
+  comidaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  comidaTipo: {
+    color: '#555',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  comidaCalorias: {
+    color: '#2E7D32',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
   /* Lista de dietas */
   list: {
     gap: 12,
@@ -766,6 +933,9 @@ const darkStyles = StyleSheet.create({
     color: '#f2f2f2',
   },
   statsRow: {
+    backgroundColor: '#262626',
+  },
+  diaCard: {
     backgroundColor: '#262626',
   },
 });

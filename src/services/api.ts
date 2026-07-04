@@ -42,6 +42,13 @@ export type Tarjeta = {
   predeterminada?: boolean;
 };
 
+export const ROLE_ADMIN = 1;
+export const ROLE_CLIENT = 2;
+
+export function isAdmin(user: { rol: number } | null | undefined) {
+  return user?.rol === ROLE_ADMIN;
+}
+
 export type UserProfile = {
   id: number;
   nombre: string;
@@ -116,6 +123,16 @@ export type RegisterPayload = {
   sexo?: string;
 };
 
+export type RegisterChildPayload = {
+  tutor_nombre: string;
+  tutor_telefono: string;
+  name: string;
+  email: string;
+  password: string;
+  edad: number;
+  sexo?: string;
+};
+
 export const auth = {
   login: (email: string, password: string) =>
     request<LoginResponse>('/user/login', {
@@ -127,6 +144,12 @@ export const auth = {
     request('/user/add_user', {
       method: 'POST',
       body: JSON.stringify({ ...payload, role: 2, tipo_cuenta: 'personal' }),
+    }),
+
+  registerChild: (payload: RegisterChildPayload) =>
+    request('/user/children/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }),
 };
 
@@ -155,6 +178,24 @@ export const userApi = {
         current_password: currentPassword,
         new_password: newPassword,
       }),
+    }),
+};
+
+export const adminApi = {
+  getAllUsers: () => request<UserProfile[]>('/user/'),
+
+  searchUsers: (query: string) =>
+    request<UserProfile[]>(`/user/search?query=${encodeURIComponent(query)}`),
+
+  updateUserRole: (userId: number, role: number) =>
+    request<{ msg: string }>(`/user/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    }),
+
+  deleteUser: (userId: number) =>
+    request<{ msg: string }>(`/user/${userId}`, {
+      method: 'DELETE',
     }),
 };
 
@@ -224,8 +265,42 @@ export type Suplemento = {
   activo: boolean;
 };
 
+export type SuplementoPayload = {
+  nombre: string;
+  descripcion: string;
+  precio: number;
+  categoria: string;
+  presentacion: string;
+  beneficios?: string;
+  modo_uso?: string;
+  stock: number;
+  activo?: boolean;
+};
+
 export const suplementosApi = {
   getActive: () => request<Suplemento[]>('/suplementos/active'),
+
+  getAll: () => request<Suplemento[]>('/suplementos/?all=true'),
+
+  create: (payload: SuplementoPayload) =>
+    request<{ msg: string; suplemento: Suplemento }>('/suplementos/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  update: (id: number, payload: Partial<SuplementoPayload>) =>
+    request<{ msg: string; suplemento: Suplemento }>(`/suplementos/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  toggleActivo: (id: number) =>
+    request<{ msg: string; suplemento: Suplemento }>(`/suplementos/${id}/toggle`, {
+      method: 'PUT',
+    }),
+
+  remove: (id: number) =>
+    request<{ msg: string }>(`/suplementos/${id}`, { method: 'DELETE' }),
 };
 
 export type Dieta = {
@@ -303,6 +378,28 @@ export type CrearDietaUsuarioPayload = {
   mantener_anterior?: boolean;
 };
 
+export type DietaUsuario = {
+  id: number;
+  usuario_id: number;
+  dieta_base_id: number | null;
+  nombre: string;
+  descripcion?: string | null;
+  fecha_inicio?: string;
+  fecha_fin?: string | null;
+  perfil_usuario: PerfilDieta | Record<string, never>;
+  plan_generado: PlanGenerado;
+  progreso: number;
+  activo: boolean;
+  fecha_creacion?: string;
+  fecha_actualizacion?: string;
+};
+
+type DietasUsuarioResponse = {
+  success: boolean;
+  data: DietaUsuario[];
+  total: number;
+};
+
 export const dietasApi = {
   getAll: async () => {
     const res = await request<DietasResponse>('/dietas/');
@@ -321,6 +418,16 @@ export const dietasApi = {
     request<{ success: boolean; msg: string; id: number }>('/dietas/usuario', {
       method: 'POST',
       body: JSON.stringify(payload),
+    }),
+
+  getMisDietas: async () => {
+    const res = await request<DietasUsuarioResponse>('/dietas/usuario');
+    return res.data;
+  },
+
+  desactivarDieta: (dietaUsuarioId: number) =>
+    request<{ success: boolean; msg: string }>(`/dietas/usuario/${dietaUsuarioId}/desactivar`, {
+      method: 'PUT',
     }),
 };
 
@@ -373,6 +480,38 @@ export type OrdenResponse = {
   notificaciones_generadas: boolean;
 };
 
+export type EstadoOrden =
+  | 'pendiente'
+  | 'confirmada'
+  | 'pagada'
+  | 'en_preparacion'
+  | 'enviada'
+  | 'entregada'
+  | 'cancelada'
+  | 'reembolsada';
+
+export type Orden = {
+  id: number;
+  codigo_unico: string;
+  nombre_usuario: string;
+  telefono_usuario: string;
+  tipo_pedido: string;
+  suplemento: Suplemento | null;
+  direccion_texto: string | null;
+  direccion_id: number | null;
+  cantidad: number;
+  precio_unitario: number;
+  precio_total: number;
+  metodo_pago: string;
+  info_pago: Record<string, unknown> | null;
+  notas: string | null;
+  pedido_json: string | null;
+  estado: EstadoOrden;
+  estado_nombre: string;
+  fecha_creacion: string | null;
+  fecha_actualizacion: string | null;
+};
+
 export const ordenesApi = {
   createCarrito: (payload: OrdenCarritoPayload) =>
     request<OrdenResponse>('/ordenes/', {
@@ -387,4 +526,18 @@ export const ordenesApi = {
         notas: payload.notas,
       }),
     }),
+
+  getAll: () => request<Orden[]>('/ordenes/'),
+
+  cambiarEstado: (ordenId: number, estado: EstadoOrden) =>
+    request<{ msg: string; orden: Orden }>(`/ordenes/${ordenId}/estado`, {
+      method: 'PUT',
+      body: JSON.stringify({ estado }),
+    }),
+
+  remove: (ordenId: number) =>
+    request<{ msg: string }>(`/ordenes/${ordenId}`, { method: 'DELETE' }),
+
+  getEstadisticas: () =>
+    request<{ success: boolean; stats: Record<string, unknown> }>('/ordenes/estadisticas'),
 };

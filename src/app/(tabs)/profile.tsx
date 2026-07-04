@@ -114,18 +114,20 @@ export default function ProfileScreen() {
     }, [currentUser?.id])
   );
 
+  function doLogout() {
+    clearToken();
+    clearUser();
+    router.replace('/login');
+  }
+
   function handleLogout() {
+    if (Platform.OS === 'web') {
+      if (window.confirm(t('profileConfirmLogoutMsg'))) doLogout();
+      return;
+    }
     Alert.alert(t('profileConfirmLogout'), t('profileConfirmLogoutMsg'), [
       { text: t('cancel'), style: 'cancel' },
-      {
-        text: t('profileLogoutFull'),
-        style: 'destructive',
-        onPress: () => {
-          clearToken();
-          clearUser();
-          router.replace('/login');
-        },
-      },
+      { text: t('profileLogoutFull'), style: 'destructive', onPress: doLogout },
     ]);
   }
 

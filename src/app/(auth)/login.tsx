@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { auth, setToken, setUser } from '@/services/api';
+import { auth, ROLE_ADMIN, setToken, setUser } from '@/services/api';
 import { useAppPreferences } from '@/context/app-preferences';
 
 export default function LoginScreen() {
@@ -93,7 +93,7 @@ export default function LoginScreen() {
                     const res = await auth.login(email, password);
                     setToken(res.access_token);
                     setUser(res.user);
-                    router.replace('/(tabs)');
+                    router.replace(res.user.rol === ROLE_ADMIN ? '/admin' : '/(tabs)');
                   } catch (err: unknown) {
                     Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('loginError'));
                   } finally {
