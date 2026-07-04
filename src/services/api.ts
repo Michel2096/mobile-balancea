@@ -467,6 +467,8 @@ export type OrdenCarritoPayload = {
   precio_total: number;
   metodo_pago?: string;
   notas?: string;
+  direccion_id?: number | string;
+  direccion_texto?: string;
 };
 
 export type OrdenResponse = {
@@ -524,6 +526,8 @@ export const ordenesApi = {
         precio_total: payload.precio_total,
         metodo_pago: payload.metodo_pago ?? 'efectivo',
         notas: payload.notas,
+        direccion_id: payload.direccion_id,
+        direccion_texto: payload.direccion_texto,
       }),
     }),
 

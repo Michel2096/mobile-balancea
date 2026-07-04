@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -61,6 +62,7 @@ export default function ProductosScreen() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selectedCategoria, setSelectedCategoria] = useState<string | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Suplemento | null>(null);
   const cartItems = useCart();
   const cartCount = getCartCount(cartItems);
 
@@ -242,9 +244,15 @@ export default function ProductosScreen() {
                 const maxedOut = !outOfStock && inCartQty >= p.stock;
                 const addDisabled = outOfStock || maxedOut;
                 return (
-                  <View
+                  <Pressable
                     key={p.id}
-                    style={[styles.card, isDark && darkStyles.card, { borderLeftColor: catColor.text }]}>
+                    onPress={() => setSelectedProduct(p)}
+                    style={({ pressed }) => [
+                      styles.card,
+                      isDark && darkStyles.card,
+                      { borderLeftColor: catColor.text },
+                      pressed && styles.cardPressed,
+                    ]}>
                     <View style={styles.cardTopRow}>
                       <View
                         style={[
@@ -304,7 +312,7 @@ export default function ProductosScreen() {
                         </Text>
                       </Pressable>
                     </View>
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>
@@ -312,7 +320,139 @@ export default function ProductosScreen() {
 
         </View>
       </ScrollView>
+
+      <ProductDetailModal
+        producto={selectedProduct}
+        isDark={isDark}
+        t={t}
+        cartItems={cartItems}
+        onClose={() => setSelectedProduct(null)}
+        onBuyNow={() => {
+          if (selectedProduct) addToCart(selectedProduct, 1);
+          setSelectedProduct(null);
+          router.push('/carrito');
+        }}
+      />
     </SafeAreaView>
+  );
+}
+
+type ProductDetailModalProps = {
+  producto: Suplemento | null;
+  isDark: boolean;
+  t: (key: string, params?: Record<string, string | number>) => string;
+  cartItems: ReturnType<typeof useCart>;
+  onClose: () => void;
+  onBuyNow: () => void;
+};
+
+function ProductDetailModal({ producto, isDark, t, cartItems, onClose, onBuyNow }: ProductDetailModalProps) {
+  if (!producto) return null;
+
+  const catColor = colorFor(producto.categoria);
+  const inCartQty = cartItems.find((i) => i.suplementoId === producto.id)?.cantidad ?? 0;
+  const outOfStock = producto.stock <= 0;
+  const maxedOut = !outOfStock && inCartQty >= producto.stock;
+  const addDisabled = outOfStock || maxedOut;
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.modalOverlay} onPress={onClose} />
+      <View style={[styles.detailModal, isDark && darkStyles.card]}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.detailHeaderRow}>
+            <View
+              style={[
+                styles.iconBadge,
+                styles.detailIconBadge,
+                { backgroundColor: catColor.bg, shadowColor: catColor.text },
+              ]}>
+              <Text style={[styles.iconBadgeText, { color: catColor.text }]}>
+                {producto.nombre[0]?.toUpperCase() ?? '?'}
+              </Text>
+            </View>
+            <Pressable style={styles.detailCloseBtn} onPress={onClose} hitSlop={8}>
+              <Text style={styles.detailCloseBtnText}>✕</Text>
+            </Pressable>
+          </View>
+
+          <Text style={[styles.detailTitle, isDark && darkStyles.cardTitle]}>{producto.nombre}</Text>
+          <Text style={styles.detailPrice}>{formatPrecio(producto.precio)}</Text>
+
+          <View style={styles.cardMetaRow}>
+            <View style={[styles.metaChip, { backgroundColor: catColor.bg }]}>
+              <Text style={[styles.metaChipText, { color: catColor.text }]}>
+                {producto.categoria_nombre}
+              </Text>
+            </View>
+            <Text style={styles.cardMeta}>{producto.presentacion_nombre}</Text>
+          </View>
+
+          <View style={styles.detailStockRow}>
+            <View style={[styles.stockDot, producto.stock > 0 ? styles.stockDotOk : styles.stockDotLow]} />
+            <Text style={styles.stockText}>
+              {producto.stock > 0 ? t('productoDetalleStock', { n: producto.stock }) : t('sinStock')}
+            </Text>
+          </View>
+
+          <View style={styles.detailSection}>
+            <Text style={[styles.detailSectionTitle, isDark && darkStyles.cardTitle]}>
+              {t('productoDetalleDescripcionTitle')}
+            </Text>
+            <Text style={styles.detailSectionText}>{producto.descripcion}</Text>
+          </View>
+
+          {producto.beneficios ? (
+            <View style={styles.detailSection}>
+              <Text style={[styles.detailSectionTitle, isDark && darkStyles.cardTitle]}>
+                {t('productoDetalleBeneficiosTitle')}
+              </Text>
+              <Text style={styles.detailSectionText}>{producto.beneficios}</Text>
+            </View>
+          ) : null}
+
+          {producto.modo_uso ? (
+            <View style={styles.detailSection}>
+              <Text style={[styles.detailSectionTitle, isDark && darkStyles.cardTitle]}>
+                {t('productoDetalleModoUsoTitle')}
+              </Text>
+              <Text style={styles.detailSectionText}>{producto.modo_uso}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.detailActions}>
+            <Pressable
+              disabled={addDisabled}
+              style={({ pressed }) => [
+                styles.detailSecondaryBtn,
+                addDisabled && styles.addBtnDisabled,
+                pressed && !addDisabled && styles.pressed,
+              ]}
+              onPress={() => addToCart(producto, 1)}>
+              <Text style={[styles.detailSecondaryBtnText, addDisabled && styles.addBtnTextDisabled]}>
+                {outOfStock
+                  ? t('sinStock')
+                  : inCartQty > 0
+                  ? t('enCarrito', { n: inCartQty })
+                  : t('agregarAlCarritoBtn')}
+              </Text>
+            </Pressable>
+            <Pressable
+              disabled={outOfStock}
+              style={({ pressed }) => [
+                styles.detailPrimaryBtn,
+                outOfStock && styles.addBtnDisabled,
+                pressed && !outOfStock && styles.pressed,
+              ]}
+              onPress={onBuyNow}>
+              <Text style={[styles.detailPrimaryBtnText, outOfStock && styles.addBtnTextDisabled]}>
+                {t('comprarAhoraBtn')}
+              </Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
   );
 }
 
@@ -529,6 +669,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  cardPressed: {
+    opacity: 0.85,
+  },
   cardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -682,6 +825,124 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   retryText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  /* Modal de detalle de producto */
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  detailModal: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    top: '10%',
+    maxHeight: '80%',
+    backgroundColor: '#ffffff',
+    borderRadius: 22,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  detailHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  detailIconBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+  },
+  detailCloseBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailCloseBtnText: {
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  detailTitle: {
+    color: '#1a2e1a',
+    fontSize: 20,
+    fontWeight: '800',
+    marginTop: 14,
+  },
+  detailPrice: {
+    color: '#2E7D32',
+    fontSize: 22,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  detailStockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  detailSection: {
+    marginTop: 16,
+    gap: 4,
+  },
+  detailSectionTitle: {
+    color: '#1a2e1a',
+    fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  detailSectionText: {
+    color: '#555',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  detailActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 22,
+  },
+  detailSecondaryBtn: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: '#eaf6df',
+    borderWidth: 1,
+    borderColor: '#d4edbc',
+  },
+  detailSecondaryBtnText: {
+    color: '#2E7D32',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  detailPrimaryBtn: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: '#2E7D32',
+    shadowColor: '#2E7D32',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  detailPrimaryBtnText: {
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '700',
