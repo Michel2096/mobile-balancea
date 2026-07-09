@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { suplementosApi, Suplemento } from '@/services/api';
 import { addToCart, getCartCount, useCart } from '@/services/cart';
 import { useAppPreferences } from '@/context/app-preferences';
@@ -372,7 +373,7 @@ function ProductDetailModal({ producto, isDark, t, cartItems, onClose, onBuyNow 
               </Text>
             </View>
             <Pressable style={styles.detailCloseBtn} onPress={onClose} hitSlop={8}>
-              <Text style={styles.detailCloseBtnText}>✕</Text>
+              <Ionicons name="close" size={15} color="#888" />
             </Pressable>
           </View>
 
@@ -871,11 +872,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  detailCloseBtnText: {
-    color: '#888',
-    fontSize: 13,
-    fontWeight: '700',
   },
   detailTitle: {
     color: '#1a2e1a',

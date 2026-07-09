@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -9,25 +10,38 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAppPreferences } from '@/context/app-preferences';
+import { BrandLogo } from '@/components/branding/brand-logo';
+import { HeroBackground } from '@/components/branding/hero-background';
+
+const OVERLAY_COLORS: [string, string] = ['rgba(93,212,93,0.88)', 'rgba(42,110,42,0.93)'];
 
 export default function ForgotPasswordScreen() {
   const { t } = useAppPreferences();
   const [email, setEmail] = useState('');
 
+  function handleSend() {
+    if (!email.trim()) {
+      Alert.alert(t('requiredFieldsTitle'), t('forgotEmailRequiredMsg'));
+      return;
+    }
+    if (Platform.OS === 'web') {
+      window.alert(t('forgotContactSupportMsg'));
+      return;
+    }
+    Alert.alert(t('forgotContactSupportTitle'), t('forgotContactSupportMsg'));
+  }
+
   return (
-    <LinearGradient colors={['#5dd45d', '#2a6e2a']} style={styles.gradient}>
+    <HeroBackground overlayColors={OVERLAY_COLORS} style={styles.gradient}>
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.container}>
 
           <View style={styles.logoBox}>
-            <View style={styles.logoRow}>
-              <Text style={styles.brandName}>Balancea</Text>
-            </View>
+            <BrandLogo variant="white" width={160} />
           </View>
 
           <View style={styles.card}>
@@ -46,7 +60,8 @@ export default function ForgotPasswordScreen() {
                 autoCorrect={false}
               />
               <Pressable
-                style={({ pressed }) => [styles.sendButton, pressed && styles.pressed]}>
+                style={({ pressed }) => [styles.sendButton, pressed && styles.pressed]}
+                onPress={handleSend}>
                 <Text style={styles.sendButtonText}>{'>'}</Text>
               </Pressable>
             </View>
@@ -58,7 +73,7 @@ export default function ForgotPasswordScreen() {
 
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </LinearGradient>
+    </HeroBackground>
   );
 }
 
@@ -82,22 +97,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 28,
     paddingVertical: 18,
-  },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  scaleChar: {
-    fontSize: 46,
-    color: '#ffffff',
-    lineHeight: 54,
-  },
-  brandName: {
-    fontSize: 46,
-    color: '#ffffff',
-    fontWeight: '300',
-    letterSpacing: -1,
-    lineHeight: 54,
   },
   card: {
     width: '100%',

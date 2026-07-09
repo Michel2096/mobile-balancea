@@ -1,68 +1,115 @@
-import { useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import { getUser, clearToken, clearUser, dashboardApi, DashboardSummary, ActivityItem } from '@/services/api';
+import {
+  getUser,
+  setUser,
+  clearToken,
+  clearUser,
+  userApi,
+  direccionesApi,
+  tarjetasApi,
+  dashboardApi,
+  ordenesApi,
+  UserProfile,
+  Direccion,
+  Tarjeta,
+  ActivityItem,
+} from '@/services/api';
 import { getCartCount, useCart } from '@/services/cart';
 import { useAppPreferences } from '@/context/app-preferences';
-import { Language } from '@/i18n/translations';
+import { NotificationButton } from '@/components/notifications/NotificationButton';
+import { Ionicons } from '@expo/vector-icons';
+import { BrandLogo } from '@/components/branding/brand-logo';
+import { HeroBackground } from '@/components/branding/hero-background';
+
+type MenuIconName = 'productos' | 'carrito' | 'nosotros' | 'dietas' | 'configuracion';
 
 type MenuItem = {
   key: string;
   labelKey: string;
-  route:
-    | '/(tabs)'
-    | '/productos'
-    | '/sobre-nosotros'
-    | '/dietas'
-    | '/configuracion'
-    | '/carrito'
-    | '/(tabs)/profile';
+  route: '/productos' | '/sobre-nosotros' | '/dietas' | '/configuracion' | '/carrito';
+  icon: MenuIconName;
+  iconBg: string;
+  iconColor: string;
 };
 
 const MENU_ITEMS: MenuItem[] = [
-  { key: 'inicio', labelKey: 'menuInicio', route: '/(tabs)' },
-  { key: 'perfil', labelKey: 'menuMiPerfil', route: '/(tabs)/profile' },
-  { key: 'productos', labelKey: 'menuProductos', route: '/productos' },
-  { key: 'carrito', labelKey: 'menuCarrito', route: '/carrito' },
-  { key: 'nosotros', labelKey: 'menuNosotros', route: '/sobre-nosotros' },
-  { key: 'dietas', labelKey: 'menuDietas', route: '/dietas' },
-  { key: 'configuracion', labelKey: 'menuConfiguracion', route: '/configuracion' },
+  { key: 'productos', labelKey: 'menuProductos', route: '/productos', icon: 'productos', iconBg: '#E8F5E9', iconColor: '#2E7D32' },
+  { key: 'carrito', labelKey: 'menuCarrito', route: '/carrito', icon: 'carrito', iconBg: '#FFF3E0', iconColor: '#E8622C' },
+  { key: 'nosotros', labelKey: 'menuNosotros', route: '/sobre-nosotros', icon: 'nosotros', iconBg: '#E3F2FD', iconColor: '#1565C0' },
+  { key: 'dietas', labelKey: 'menuDietas', route: '/dietas', icon: 'dietas', iconBg: '#EDE7F6', iconColor: '#7B1FA2' },
+  { key: 'configuracion', labelKey: 'menuConfiguracion', route: '/configuracion', icon: 'configuracion', iconBg: '#FCE4EC', iconColor: '#AD1457' },
 ];
 
-function BasketIcon() {
-  return (
-    <View style={styles.basketIconWrap}>
-      <View style={styles.basketIconBody} />
-      <View style={styles.basketIconHandle} />
-    </View>
-  );
+function MenuItemIcon({ name, color }: { name: MenuIconName; color: string }) {
+  switch (name) {
+    case 'productos':
+      return (
+        <View style={styles.miCapsuleWrap}>
+          <View style={[styles.miCapsuleHalf, { backgroundColor: color }]} />
+          <View style={[styles.miCapsuleHalf, { backgroundColor: color, opacity: 0.4 }]} />
+        </View>
+      );
+    case 'carrito':
+      return (
+        <View style={styles.miBasketWrap}>
+          <View style={[styles.miBasketHandle, { borderColor: color }]} />
+          <View style={[styles.miBasketBody, { backgroundColor: color }]} />
+        </View>
+      );
+    case 'nosotros':
+      return (
+        <View style={styles.miInfoWrap}>
+          <View style={[styles.miInfoDot, { backgroundColor: color }]} />
+          <View style={[styles.miInfoBar, { backgroundColor: color }]} />
+        </View>
+      );
+    case 'dietas':
+      return (
+        <View style={styles.miTargetWrap}>
+          <View style={[styles.miTargetRing, { borderColor: color }]} />
+          <View style={[styles.miTargetDot, { backgroundColor: color }]} />
+        </View>
+      );
+    case 'configuracion':
+      return (
+        <View style={styles.miGearWrap}>
+          <View style={[styles.miGearRing, { borderColor: color }]} />
+          <View style={[styles.miGearNotchH, { backgroundColor: color }]} />
+          <View style={[styles.miGearNotchV, { backgroundColor: color }]} />
+        </View>
+      );
+  }
 }
 
-function greetingKey() {
-  const h = new Date().getHours();
-  if (h < 12) return 'greetingMorning';
-  if (h < 19) return 'greetingAfternoon';
-  return 'greetingEvening';
-}
+const MONTHS: Record<'es' | 'en', string[]> = {
+  es: ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'],
+  en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+};
 
-function formatDate(language: Language) {
-  return new Date().toLocaleDateString(language === 'es' ? 'es-MX' : 'en-US', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+function formatMemberSince(dateStr: string | undefined, lang: 'es' | 'en') {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '—';
+  return `${MONTHS[lang][d.getMonth()]} ${d.getFullYear()}`;
 }
 
 function formatRelative(dateStr: string, t: (key: string, params?: Record<string, string | number>) => string) {
@@ -75,299 +122,932 @@ function formatRelative(dateStr: string, t: (key: string, params?: Record<string
   return t('timeDaysAgo', { n: days });
 }
 
-type StatCardProps = {
-  label: string;
-  value: string;
-  unit?: string;
-  accent?: boolean;
-  isDark: boolean;
-};
+const GENDER_OPTIONS = [
+  { value: 'masculino', labelKey: 'profileGenderMale' },
+  { value: 'femenino', labelKey: 'profileGenderFemale' },
+  { value: 'otro', labelKey: 'profileGenderOther' },
+  { value: 'no_decir', labelKey: 'profileGenderPrefer' },
+];
 
-function StatCard({ label, value, unit, accent, isDark }: StatCardProps) {
+function BasketIcon() {
   return (
-    <View style={[styles.statCard, isDark && darkStyles.statCard, accent && styles.statCardAccent]}>
-      <Text style={[styles.statValue, isDark && darkStyles.statValue, accent && styles.statValueAccent]}>
-        {value}
-      </Text>
-      {unit ? (
-        <Text style={[styles.statUnit, accent && styles.statUnitAccent]}>{unit}</Text>
-      ) : null}
-      <Text style={[styles.statLabel, accent && styles.statLabelAccent]}>{label}</Text>
+    <View style={styles.basketIconWrap}>
+      <View style={styles.basketIconBody} />
+      <View style={styles.basketIconHandle} />
     </View>
   );
 }
 
-export default function DashboardScreen() {
+export default function ProfileScreen() {
   const { isDark, language, t } = useAppPreferences();
-  const user = getUser();
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [activity, setActivity] = useState<ActivityItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [menuVisible, setMenuVisible] = useState(false);
+  const currentUser = getUser();
   const cartItems = useCart();
   const cartCount = getCartCount(cartItems);
+  const { width: screenWidth } = useWindowDimensions();
+  const menuPanelWidth = Math.min(screenWidth * 0.82, 320);
 
-  function handleLogout() {
-    clearToken();
-    clearUser();
-    router.replace('/login');
+  const [profile, setProfile] = useState<UserProfile | null>(currentUser);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [pedidosCount, setPedidosCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const menuSlide = useRef(new Animated.Value(0)).current;
+
+  const [nombre, setNombre] = useState('');
+  const [correo, setCorreo] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [sexo, setSexo] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [genderModalVisible, setGenderModalVisible] = useState(false);
+
+  const [addAddressVisible, setAddAddressVisible] = useState(false);
+  const [calle, setCalle] = useState('');
+  const [numeroExterior, setNumeroExterior] = useState('');
+  const [numeroInterior, setNumeroInterior] = useState('');
+  const [colonia, setColonia] = useState('');
+  const [ciudad, setCiudad] = useState('');
+  const [estado, setEstado] = useState('');
+  const [codigoPostal, setCodigoPostal] = useState('');
+  const [referencias, setReferencias] = useState('');
+  const [savingAddress, setSavingAddress] = useState(false);
+
+  const [addCardVisible, setAddCardVisible] = useState(false);
+  const [nombreTitular, setNombreTitular] = useState('');
+  const [numeroTarjeta, setNumeroTarjeta] = useState('');
+  const [mesExpiracion, setMesExpiracion] = useState('');
+  const [anioExpiracion, setAnioExpiracion] = useState('');
+  const [savingCard, setSavingCard] = useState(false);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  function applyProfile(data: UserProfile) {
+    setProfile(data);
+    setNombre(data.nombre ?? '');
+    setCorreo(data.correo ?? '');
+    setTelefono(data.telefono ?? '');
+    setSexo(data.sexo ?? '');
   }
 
-  function handleSelectMenuItem(item: MenuItem) {
-    setMenuVisible(false);
-    router.push(item.route);
-  }
-
-  async function fetchData(silent = false) {
-    if (!user) return;
-    if (!silent) setLoading(true);
+  async function fetchProfile() {
+    if (!currentUser) return;
+    setLoading(true);
     setError(null);
     try {
-      const [s, a] = await Promise.all([
-        dashboardApi.getSummary(user.id),
-        dashboardApi.getActivity(user.id),
+      const [data, activityData, ordenes] = await Promise.all([
+        userApi.getProfile(currentUser.id),
+        dashboardApi.getActivity(currentUser.id).catch(() => []),
+        currentUser.telefono
+          ? ordenesApi.getByTelefono(currentUser.telefono).catch(() => [])
+          : Promise.resolve([]),
       ]);
-      setSummary(s);
-      setActivity(a);
+      applyProfile(data);
+      setActivity(activityData);
+      setPedidosCount(ordenes.length);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('loadErrorFallback'));
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }
 
   useFocusEffect(
     useCallback(() => {
-      fetchData();
-    }, [user?.id])
+      fetchProfile();
+    }, [currentUser?.id])
   );
 
-  function onRefresh() {
-    setRefreshing(true);
-    fetchData(true);
+  function doLogout() {
+    clearToken();
+    clearUser();
+    router.replace('/login');
   }
 
-  const pct = summary?.meta_semanal_pct ?? 0;
-  const firstName = user?.nombre?.split(' ')[0] ?? 'Usuario';
+  function handleLogout() {
+    if (Platform.OS === 'web') {
+      if (window.confirm(t('profileConfirmLogoutMsg'))) doLogout();
+      return;
+    }
+    Alert.alert(t('profileConfirmLogout'), t('profileConfirmLogoutMsg'), [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('profileLogoutFull'), style: 'destructive', onPress: doLogout },
+    ]);
+  }
+
+  function openMenu() {
+    menuSlide.setValue(0);
+    setMenuVisible(true);
+  }
+
+  function closeMenu(after?: () => void) {
+    Animated.timing(menuSlide, {
+      toValue: 0,
+      duration: 220,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setMenuVisible(false);
+        after?.();
+      }
+    });
+  }
+
+  useEffect(() => {
+    if (menuVisible) {
+      Animated.timing(menuSlide, {
+        toValue: 1,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [menuVisible, menuSlide]);
+
+  function handleSelectMenuItem(item: MenuItem) {
+    closeMenu(() => router.push(item.route));
+  }
+
+  async function handleSaveProfile() {
+    if (!profile) return;
+    setSavingProfile(true);
+    try {
+      const updated = await userApi.updateProfile(profile.id, {
+        nombre: nombre.trim(),
+        correo: correo.trim(),
+        telefono: telefono.trim(),
+        sexo: sexo || undefined,
+      });
+      setUser(updated);
+      applyProfile(updated);
+      Alert.alert(t('successTitle'), t('profileUpdateSuccess'));
+    } catch (err: unknown) {
+      Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('profileUpdateError'));
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function handleAddAddress() {
+    if (!calle || !numeroExterior || !colonia || !ciudad || !estado || !codigoPostal) {
+      Alert.alert(t('requiredFieldsTitle'), t('requiredFieldsMsg'));
+      return;
+    }
+    setSavingAddress(true);
+    try {
+      await direccionesApi.add({
+        calle,
+        numero_exterior: numeroExterior,
+        numero_interior: numeroInterior || undefined,
+        colonia,
+        ciudad,
+        estado,
+        codigo_postal: codigoPostal,
+        referencias: referencias || undefined,
+      });
+      setCalle('');
+      setNumeroExterior('');
+      setNumeroInterior('');
+      setColonia('');
+      setCiudad('');
+      setEstado('');
+      setCodigoPostal('');
+      setReferencias('');
+      setAddAddressVisible(false);
+      Alert.alert(t('successTitle'), t('profileAddressAdded'));
+      await fetchProfile();
+    } catch (err: unknown) {
+      Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('profileAddressError'));
+    } finally {
+      setSavingAddress(false);
+    }
+  }
+
+  function handleDeleteAddress(direccion: Direccion) {
+    Alert.alert(t('profileConfirmDeleteAddress'), undefined, [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('profileDelete'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await direccionesApi.remove(direccion.id);
+            await fetchProfile();
+          } catch (err: unknown) {
+            Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('profileAddressError'));
+          }
+        },
+      },
+    ]);
+  }
+
+  async function handleAddCard() {
+    if (!nombreTitular || !numeroTarjeta || !mesExpiracion || !anioExpiracion) {
+      Alert.alert(t('requiredFieldsTitle'), t('requiredFieldsMsg'));
+      return;
+    }
+    if (!profile) return;
+    setSavingCard(true);
+    try {
+      await tarjetasApi.add(profile.id, {
+        nombre_titular: nombreTitular,
+        numero_tarjeta: numeroTarjeta,
+        mes_expiracion: mesExpiracion,
+        anio_expiracion: anioExpiracion,
+      });
+      setNombreTitular('');
+      setNumeroTarjeta('');
+      setMesExpiracion('');
+      setAnioExpiracion('');
+      setAddCardVisible(false);
+      Alert.alert(t('successTitle'), t('profileCardAdded'));
+      await fetchProfile();
+    } catch (err: unknown) {
+      Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('profileCardError'));
+    } finally {
+      setSavingCard(false);
+    }
+  }
+
+  function handleDeleteCard(tarjeta: Tarjeta) {
+    Alert.alert(t('profileConfirmDeleteCard'), undefined, [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('profileDelete'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await tarjetasApi.remove(tarjeta.id);
+            await fetchProfile();
+          } catch (err: unknown) {
+            Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('profileCardError'));
+          }
+        },
+      },
+    ]);
+  }
+
+  async function handleChangePassword() {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert(t('requiredFieldsTitle'), t('requiredFieldsMsg'));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert(t('errorTitle'), t('passwordMismatch'));
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await userApi.changePassword(currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      Alert.alert(t('successTitle'), t('passwordUpdated'));
+    } catch (err: unknown) {
+      Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('passwordUpdateError'));
+    } finally {
+      setSavingPassword(false);
+    }
+  }
+
+  const initial = (profile?.nombre ?? 'U')[0]?.toUpperCase() ?? 'U';
+  const roleLabel =
+    profile?.rol_texto === 'admin' ? t('profileRoleAdmin') : t('profileRoleClient');
+  const genderLabel = GENDER_OPTIONS.find((g) => g.value === sexo)?.labelKey;
+  const direcciones = profile?.direcciones ?? [];
+  const tarjetas = profile?.tarjetas ?? [];
 
   return (
     <SafeAreaView style={[styles.safeArea, isDark && darkStyles.safeArea]}>
-      <ScrollView
-        contentContainerStyle={[styles.scrollOuter, isDark && darkStyles.scrollOuter]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#4EC920"
-            colors={['#4EC920']}
-          />
-        }>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.kav}>
+        <ScrollView
+          contentContainerStyle={[styles.scrollOuter, isDark && darkStyles.scrollOuter]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
 
-        {/* Encabezado en degradado */}
-        <LinearGradient
-          colors={['#4EC920', '#1B5E20']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}>
-          <View pointerEvents="none" style={styles.headerBlob} />
+          {/* Encabezado con fondo de marca */}
+          <HeroBackground style={styles.header}>
+            <View pointerEvents="none" style={styles.headerBlob} />
 
-          <View style={styles.headerTopRow}>
-            <Pressable
-              onPress={() => setMenuVisible(true)}
-              style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}
-              hitSlop={10}>
-              <Text style={styles.menuButtonIcon}>☰</Text>
-            </Pressable>
-
-            <View style={styles.headerRightRow}>
+            <View style={styles.headerTopRow}>
               <Pressable
-                onPress={() => router.push('/carrito')}
-                style={({ pressed }) => [styles.cartButton, pressed && styles.pressed]}
+                onPress={openMenu}
+                style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}
                 hitSlop={10}>
-                <BasketIcon />
-                {cartCount > 0 && (
-                  <View style={styles.cartBadge}>
-                    <Text style={styles.cartBadgeText}>{cartCount > 9 ? '9+' : cartCount}</Text>
-                  </View>
-                )}
+                <View style={styles.hamburgerIcon}>
+                  <View style={styles.hamburgerBar} />
+                  <View style={[styles.hamburgerBar, styles.hamburgerBarMid]} />
+                  <View style={styles.hamburgerBar} />
+                </View>
               </Pressable>
 
-              <Pressable onPress={() => router.push('/(tabs)/profile')} style={styles.avatarCircle}>
-                <Text style={styles.avatarLetter}>
-                  {(user?.nombre ?? 'U')[0].toUpperCase()}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-
-          <Text style={styles.greetingText}>{t(greetingKey())},</Text>
-          <Text style={styles.nameText}>{firstName}</Text>
-          <Text style={styles.dateText}>{formatDate(language)}</Text>
-        </LinearGradient>
-
-        <Modal
-          visible={menuVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setMenuVisible(false)}>
-          <Pressable style={styles.menuOverlay} onPress={() => setMenuVisible(false)} />
-          <SafeAreaView
-            style={[styles.menuPanel, isDark && darkStyles.menuPanel]}
-            edges={['top', 'left', 'bottom']}>
-            <LinearGradient
-              colors={['#4EC920', '#1B5E20']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.menuHeader}>
-              <View pointerEvents="none" style={styles.menuHeaderBlob} />
-              <View style={styles.menuAvatarCircle}>
-                <Text style={styles.menuAvatarLetter}>
-                  {(user?.nombre ?? 'U')[0].toUpperCase()}
-                </Text>
-              </View>
-              <Text style={styles.menuUserName} numberOfLines={1}>{user?.nombre ?? 'Usuario'}</Text>
-              <Text style={styles.menuUserEmail} numberOfLines={1}>{user?.correo ?? ''}</Text>
-            </LinearGradient>
-
-            <ScrollView style={styles.menuBody} showsVerticalScrollIndicator={false}>
-              {MENU_ITEMS.map((item) => (
+              <View style={styles.headerRightRow}>
+                <NotificationButton />
                 <Pressable
-                  key={item.key}
-                  style={({ pressed }) => [
-                    styles.menuItem,
-                    isDark && darkStyles.menuItem,
-                    pressed && styles.menuItemPressed,
-                  ]}
-                  onPress={() => handleSelectMenuItem(item)}>
-                  <View style={styles.menuItemDot} />
-                  <Text style={[styles.menuItemText, isDark && darkStyles.menuItemText]}>
-                    {t(item.labelKey)}
-                  </Text>
-                  <Text style={styles.menuItemChevron}>›</Text>
+                  onPress={() => router.push('/carrito')}
+                  style={({ pressed }) => [styles.cartButton, pressed && styles.pressed]}
+                  hitSlop={10}>
+                  <BasketIcon />
+                  {cartCount > 0 && (
+                    <View style={styles.cartBadge}>
+                      <Text style={styles.cartBadgeText}>{cartCount > 9 ? '9+' : cartCount}</Text>
+                    </View>
+                  )}
                 </Pressable>
-              ))}
-
-              <Pressable
-                style={({ pressed }) => [styles.menuLogoutItem, pressed && styles.menuLogoutItemPressed]}
-                onPress={() => {
-                  setMenuVisible(false);
-                  handleLogout();
-                }}>
-                <Text style={styles.menuLogoutText}>{t('menuLogout')}</Text>
-              </Pressable>
-            </ScrollView>
-          </SafeAreaView>
-        </Modal>
-
-        <View style={styles.content}>
-          {loading && !refreshing ? (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color="#4EC920" />
-              <Text style={styles.loadingText}>{t('dashLoading')}</Text>
-            </View>
-          ) : error ? (
-            <View style={styles.errorBox}>
-              <Text style={[styles.errorTitle, isDark && darkStyles.cardTitle]}>
-                {t('loadErrorTitle')}
-              </Text>
-              <Text style={styles.errorText}>{error}</Text>
-              <Pressable onPress={() => fetchData()} style={styles.retryBtn}>
-                <Text style={styles.retryText}>{t('retry')}</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <>
-              {/* Stat cards flotantes */}
-              <View style={[styles.floatingCard, isDark && darkStyles.card]}>
-                <Text style={[styles.floatingCardTitle, isDark && darkStyles.cardTitle]}>
-                  {t('dashSummaryTitle')}
-                </Text>
-                <View style={styles.statsGrid}>
-                  <StatCard
-                    label={t('statBalance')}
-                    value={String(summary?.balance_score ?? '0')}
-                    unit={t('statBalanceUnit')}
-                    accent
-                    isDark={isDark}
-                  />
-                  <StatCard
-                    label={t('statActividades')}
-                    value={String(summary?.actividades_completadas ?? '0')}
-                    unit={t('statActividadesUnit')}
-                    isDark={isDark}
-                  />
-                  <StatCard
-                    label={t('statRacha')}
-                    value={String(summary?.racha_dias ?? '0')}
-                    unit={t('statRachaUnit')}
-                    isDark={isDark}
-                  />
-                  <StatCard
-                    label={t('statMeta')}
-                    value={`${summary?.meta_semanal_pct ?? '0'}%`}
-                    isDark={isDark}
-                  />
-                </View>
               </View>
+            </View>
 
-              {/* Progress bar */}
-              <Text style={[styles.sectionTitle, isDark && darkStyles.cardTitle]}>
-                {t('weeklyProgressTitle')}
-              </Text>
-              <View style={[styles.card, isDark && darkStyles.card]}>
-                <View style={styles.progressHeader}>
-                  <Text style={styles.progressLabel}>{t('weeklyProgressLabel')}</Text>
-                  <Text style={styles.progressPct}>{pct}%</Text>
-                </View>
-                <View style={styles.progressTrack}>
-                  <View style={[styles.progressFill, { width: `${Math.min(pct, 100)}%` }]} />
-                </View>
-                <Text style={styles.progressSub}>
-                  {pct >= 100
-                    ? t('weeklyProgressDone')
-                    : pct >= 50
-                    ? t('weeklyProgressGood')
-                    : t('weeklyProgressPending')}
-                </Text>
-              </View>
+            <Text style={styles.headerTitle}>{t('profileTitle')}</Text>
+            <Text style={styles.headerSubtitle}>{t('profileSubtitle')}</Text>
 
-              {/* Recent activity */}
-              <Text style={[styles.sectionTitle, isDark && darkStyles.cardTitle]}>
-                {t('recentActivityTitle')}
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarInitial}>{initial}</Text>
+            </View>
+            <Text style={styles.nameText}>{profile?.nombre ?? 'Usuario'}</Text>
+            <View style={styles.rolePill}>
+              <Text style={styles.rolePillText}>{roleLabel}</Text>
+            </View>
+            <Text style={styles.emailBadge}>{profile?.correo ?? ''}</Text>
+            {!!profile?.telefono && (
+              <Text style={styles.phoneCountryText}>
+                {profile.telefono} · {t('profileCountry')}
               </Text>
-              <View style={[styles.card, isDark && darkStyles.card]}>
-                {activity.length === 0 ? (
-                  <Text style={styles.emptyText}>{t('noActivity')}</Text>
-                ) : (
-                  activity.map((item, idx) => (
-                    <View
-                      key={item.id}
-                      style={[styles.activityRow, idx < activity.length - 1 && styles.activityDivider]}>
-                      <View style={[styles.dot, item.completada && styles.dotDone]} />
-                      <View style={styles.activityInfo}>
-                        <Text style={[styles.activityTitle, isDark && darkStyles.cardTitle]}>
-                          {item.titulo}
-                        </Text>
-                        <Text style={styles.activityTime}>{formatRelative(item.fecha, t)}</Text>
+            )}
+            <Text style={styles.memberSince}>
+              {t('profileMemberSince')} {formatMemberSince(profile?.fecha_registro, language)}
+            </Text>
+          </HeroBackground>
+
+          <Modal
+            visible={menuVisible}
+            transparent
+            animationType="none"
+            onRequestClose={() => closeMenu()}>
+            <Animated.View
+              style={[styles.menuOverlay, { opacity: menuSlide }]}>
+              <Pressable style={StyleSheet.absoluteFill} onPress={() => closeMenu()} />
+            </Animated.View>
+            <Animated.View
+              style={[
+                styles.menuPanelWrap,
+                {
+                  width: menuPanelWidth,
+                  transform: [
+                    {
+                      translateX: menuSlide.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-menuPanelWidth, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}>
+              <SafeAreaView
+                style={[styles.menuPanel, isDark && darkStyles.menuPanel]}
+                edges={['top', 'left', 'bottom']}>
+                <LinearGradient
+                  colors={['#4EC920', '#1B5E20']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.menuHeader}>
+                  <View pointerEvents="none" style={styles.menuHeaderBlob} />
+                  <BrandLogo variant="white" width={110} style={styles.menuHeaderLogo} />
+                  <View style={styles.menuAvatarCircle}>
+                    <Text style={styles.menuAvatarLetter}>
+                      {(profile?.nombre ?? 'U')[0].toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.menuUserName} numberOfLines={1}>
+                    {profile?.nombre ?? 'Usuario'}
+                  </Text>
+                  <Text style={styles.menuUserEmail} numberOfLines={1}>
+                    {profile?.correo ?? ''}
+                  </Text>
+                </LinearGradient>
+
+                <ScrollView style={styles.menuBody} showsVerticalScrollIndicator={false}>
+                  <Text style={[styles.menuSectionLabel, isDark && darkStyles.menuSectionLabel]}>
+                    {t('menuSectionNavigation')}
+                  </Text>
+                  {MENU_ITEMS.map((item) => (
+                    <Pressable
+                      key={item.key}
+                      style={({ pressed }) => [
+                        styles.menuItem,
+                        isDark && darkStyles.menuItem,
+                        pressed && styles.menuItemPressed,
+                      ]}
+                      onPress={() => handleSelectMenuItem(item)}>
+                      <View style={[styles.menuItemIconBubble, { backgroundColor: item.iconBg }]}>
+                        <MenuItemIcon name={item.icon} color={item.iconColor} />
                       </View>
-                      {item.completada && (
-                        <View style={styles.badge}>
-                          <Text style={styles.badgeText}>✓</Text>
+                      <Text style={[styles.menuItemText, isDark && darkStyles.menuItemText]}>
+                        {t(item.labelKey)}
+                      </Text>
+                      <Text style={styles.menuItemChevron}>›</Text>
+                    </Pressable>
+                  ))}
+
+                  <Pressable
+                    style={({ pressed }) => [styles.menuLogoutItem, pressed && styles.menuLogoutItemPressed]}
+                    onPress={() => closeMenu(handleLogout)}>
+                    <Text style={styles.menuLogoutText}>{t('menuLogout')}</Text>
+                  </Pressable>
+                </ScrollView>
+              </SafeAreaView>
+            </Animated.View>
+          </Modal>
+
+          <View style={styles.content}>
+
+            {/* Stats */}
+            <View style={styles.statsRow}>
+              <View style={[styles.statBox, isDark && darkStyles.card]}>
+                <Text style={[styles.statValue, isDark && darkStyles.cardTitle]}>
+                  {profile?.total_direcciones ?? direcciones.length}
+                </Text>
+                <Text style={[styles.statLabel, isDark && darkStyles.cardSubtitle]}>
+                  {t('profileAddresses')}
+                </Text>
+              </View>
+              <View style={[styles.statBox, isDark && darkStyles.card]}>
+                <Text style={[styles.statValue, isDark && darkStyles.cardTitle]}>
+                  {profile?.total_tarjetas ?? tarjetas.length}
+                </Text>
+                <Text style={[styles.statLabel, isDark && darkStyles.cardSubtitle]}>
+                  {t('profileCards')}
+                </Text>
+              </View>
+              <View style={[styles.statBox, isDark && darkStyles.card]}>
+                <Text style={[styles.statValue, isDark && darkStyles.cardTitle]}>
+                  {pedidosCount}
+                </Text>
+                <Text style={[styles.statLabel, isDark && darkStyles.cardSubtitle]}>
+                  {t('profileOrders')}
+                </Text>
+              </View>
+            </View>
+
+            {loading ? (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator size="large" color="#4EC920" />
+              </View>
+            ) : error ? (
+              <View style={styles.errorBox}>
+                <Text style={[styles.errorTitle, isDark && darkStyles.cardTitle]}>
+                  {t('loadErrorTitle')}
+                </Text>
+                <Text style={styles.errorText}>{error}</Text>
+                <Pressable onPress={fetchProfile} style={styles.retryBtn}>
+                  <Text style={styles.retryText}>{t('retry')}</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                {/* Informacion personal */}
+                <View style={[styles.card, isDark && darkStyles.card]}>
+                  <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                    {t('profilePersonalInfo')}
+                  </Text>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.label}>{t('profileFullName')}</Text>
+                    <TextInput
+                      style={[styles.input, isDark && darkStyles.input]}
+                      value={nombre}
+                      onChangeText={setNombre}
+                      autoCapitalize="words"
+                    />
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.label}>{t('email')}</Text>
+                    <TextInput
+                      style={[styles.input, isDark && darkStyles.input]}
+                      value={correo}
+                      onChangeText={setCorreo}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                    />
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.label}>{t('phone')}</Text>
+                    <TextInput
+                      style={[styles.input, isDark && darkStyles.input]}
+                      value={telefono}
+                      onChangeText={setTelefono}
+                      keyboardType="phone-pad"
+                    />
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.label}>{t('profileGender')}</Text>
+                    <Pressable
+                      style={[styles.selectBox, isDark && darkStyles.input]}
+                      onPress={() => setGenderModalVisible(true)}>
+                      <Text style={[styles.selectBoxText, isDark && darkStyles.readonlyText]}>
+                        {genderLabel ? t(genderLabel) : t('profileSelect')}
+                      </Text>
+                      <Text style={styles.selectBoxChevron}>▾</Text>
+                    </Pressable>
+                  </View>
+
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.saveButton,
+                      (pressed || savingProfile) && styles.pressed,
+                    ]}
+                    onPress={handleSaveProfile}
+                    disabled={savingProfile}>
+                    <Text style={styles.saveButtonText}>
+                      {savingProfile ? t('saving') : t('profileEditFull')}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* Actividad reciente */}
+                <View style={[styles.card, isDark && darkStyles.card]}>
+                  <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                    {t('recentActivityTitle')}
+                  </Text>
+                  {activity.length === 0 ? (
+                    <Text style={styles.emptyDesc}>{t('noActivity')}</Text>
+                  ) : (
+                    activity.map((item, idx) => (
+                      <View
+                        key={item.id}
+                        style={[styles.activityRow, idx < activity.length - 1 && styles.activityDivider]}>
+                        <View style={[styles.dot, item.completada && styles.dotDone]} />
+                        <View style={styles.activityInfo}>
+                          <Text style={[styles.activityTitle, isDark && darkStyles.cardTitle]}>
+                            {item.titulo}
+                          </Text>
+                          <Text style={styles.activityTime}>{formatRelative(item.fecha, t)}</Text>
                         </View>
+                        {item.completada && (
+                          <View style={styles.badge}>
+                            <Ionicons name="checkmark" size={12} color="#4EC920" />
+                          </View>
+                        )}
+                      </View>
+                    ))
+                  )}
+                </View>
+
+                {/* Mis direcciones */}
+                <View style={[styles.card, isDark && darkStyles.card]}>
+                  <View style={styles.cardHeaderRow}>
+                    <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                      {t('profileMyAddresses')}
+                    </Text>
+                    <Pressable
+                      style={({ pressed }) => [styles.smallBtn, pressed && styles.pressed]}
+                      onPress={() => setAddAddressVisible((v) => !v)}>
+                      <Text style={styles.smallBtnText}>{t('profileManage')}</Text>
+                    </Pressable>
+                  </View>
+
+                  {direcciones.length === 0 ? (
+                    <View style={styles.emptyState}>
+                      <Text style={[styles.emptyTitle, isDark && darkStyles.cardTitle]}>
+                        {t('profileNoAddressesTitle')}
+                      </Text>
+                      <Text style={styles.emptyDesc}>{t('profileNoAddressesDesc')}</Text>
+                      {!addAddressVisible && (
+                        <Pressable onPress={() => setAddAddressVisible(true)}>
+                          <Text style={styles.emptyCta}>{t('profileAddFirstAddress')}</Text>
+                        </Pressable>
                       )}
                     </View>
-                  ))
-                )}
-              </View>
-            </>
-          )}
-        </View>
+                  ) : (
+                    <View style={styles.listGroup}>
+                      {direcciones.map((d) => (
+                        <View
+                          key={d.id}
+                          style={[styles.listRow, isDark && darkStyles.readonlyBox]}>
+                          <Text style={[styles.listRowText, isDark && darkStyles.readonlyText]}>
+                            {d.direccion_completa ??
+                              `${d.calle} ${d.numero_exterior}, ${d.colonia}, ${d.ciudad}`}
+                          </Text>
+                          <Pressable onPress={() => handleDeleteAddress(d)} hitSlop={8}>
+                            <Text style={styles.listRowDelete}>{t('profileDelete')}</Text>
+                          </Pressable>
+                        </View>
+                      ))}
+                    </View>
+                  )}
 
-      </ScrollView>
+                  {addAddressVisible && (
+                    <View style={styles.inlineForm}>
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.label}>{t('profileStreet')}</Text>
+                        <TextInput
+                          style={[styles.input, isDark && darkStyles.input]}
+                          value={calle}
+                          onChangeText={setCalle}
+                        />
+                      </View>
+                      <View style={styles.fieldRow}>
+                        <View style={[styles.fieldGroup, styles.fieldFlex]}>
+                          <Text style={styles.label}>{t('profileExtNumber')}</Text>
+                          <TextInput
+                            style={[styles.input, isDark && darkStyles.input]}
+                            value={numeroExterior}
+                            onChangeText={setNumeroExterior}
+                          />
+                        </View>
+                        <View style={[styles.fieldGroup, styles.fieldFlex]}>
+                          <Text style={styles.label}>{t('profileIntNumber')}</Text>
+                          <TextInput
+                            style={[styles.input, isDark && darkStyles.input]}
+                            value={numeroInterior}
+                            onChangeText={setNumeroInterior}
+                          />
+                        </View>
+                      </View>
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.label}>{t('profileNeighborhood')}</Text>
+                        <TextInput
+                          style={[styles.input, isDark && darkStyles.input]}
+                          value={colonia}
+                          onChangeText={setColonia}
+                        />
+                      </View>
+                      <View style={styles.fieldRow}>
+                        <View style={[styles.fieldGroup, styles.fieldFlex]}>
+                          <Text style={styles.label}>{t('profileCity')}</Text>
+                          <TextInput
+                            style={[styles.input, isDark && darkStyles.input]}
+                            value={ciudad}
+                            onChangeText={setCiudad}
+                          />
+                        </View>
+                        <View style={[styles.fieldGroup, styles.fieldFlex]}>
+                          <Text style={styles.label}>{t('profileState')}</Text>
+                          <TextInput
+                            style={[styles.input, isDark && darkStyles.input]}
+                            value={estado}
+                            onChangeText={setEstado}
+                          />
+                        </View>
+                      </View>
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.label}>{t('profileZip')}</Text>
+                        <TextInput
+                          style={[styles.input, isDark && darkStyles.input]}
+                          value={codigoPostal}
+                          onChangeText={setCodigoPostal}
+                          keyboardType="number-pad"
+                        />
+                      </View>
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.label}>{t('profileReferences')}</Text>
+                        <TextInput
+                          style={[styles.input, isDark && darkStyles.input]}
+                          value={referencias}
+                          onChangeText={setReferencias}
+                        />
+                      </View>
+                      <View style={styles.inlineFormActions}>
+                        <Pressable
+                          style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}
+                          onPress={() => setAddAddressVisible(false)}>
+                          <Text style={styles.cancelBtnText}>{t('cancel')}</Text>
+                        </Pressable>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.saveButton,
+                            styles.inlineSaveBtn,
+                            (pressed || savingAddress) && styles.pressed,
+                          ]}
+                          onPress={handleAddAddress}
+                          disabled={savingAddress}>
+                          <Text style={styles.saveButtonText}>
+                            {savingAddress ? t('saving') : t('profileAddAddress')}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                {/* Mis tarjetas */}
+                <View style={[styles.card, isDark && darkStyles.card]}>
+                  <View style={styles.cardHeaderRow}>
+                    <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                      {t('profileMyCards')}
+                    </Text>
+                    <Pressable
+                      style={({ pressed }) => [styles.smallBtn, pressed && styles.pressed]}
+                      onPress={() => setAddCardVisible((v) => !v)}>
+                      <Text style={styles.smallBtnText}>{t('profileAddCard')}</Text>
+                    </Pressable>
+                  </View>
+
+                  {tarjetas.length === 0 ? (
+                    <View style={styles.emptyState}>
+                      <Text style={[styles.emptyTitle, isDark && darkStyles.cardTitle]}>
+                        {t('profileNoCardsTitle')}
+                      </Text>
+                      <Text style={styles.emptyDesc}>{t('profileNoCardsDesc')}</Text>
+                      {!addCardVisible && (
+                        <Pressable onPress={() => setAddCardVisible(true)}>
+                          <Text style={styles.emptyCta}>{t('profileAddFirstCard')}</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  ) : (
+                    <View style={styles.listGroup}>
+                      {tarjetas.map((c) => (
+                        <View
+                          key={c.id}
+                          style={[styles.listRow, isDark && darkStyles.readonlyBox]}>
+                          <Text style={[styles.listRowText, isDark && darkStyles.readonlyText]}>
+                            {c.tipo_tarjeta?.toUpperCase()} •••• {c.numero_enmascarado?.slice(-4)}{' '}
+                            · {c.mes_expiracion}/{c.anio_expiracion}
+                          </Text>
+                          <Pressable onPress={() => handleDeleteCard(c)} hitSlop={8}>
+                            <Text style={styles.listRowDelete}>{t('profileDelete')}</Text>
+                          </Pressable>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {addCardVisible && (
+                    <View style={styles.inlineForm}>
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.label}>{t('profileCardHolder')}</Text>
+                        <TextInput
+                          style={[styles.input, isDark && darkStyles.input]}
+                          value={nombreTitular}
+                          onChangeText={setNombreTitular}
+                          autoCapitalize="words"
+                        />
+                      </View>
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.label}>{t('profileCardNumber')}</Text>
+                        <TextInput
+                          style={[styles.input, isDark && darkStyles.input]}
+                          value={numeroTarjeta}
+                          onChangeText={setNumeroTarjeta}
+                          keyboardType="number-pad"
+                          maxLength={19}
+                        />
+                      </View>
+                      <View style={styles.fieldRow}>
+                        <View style={[styles.fieldGroup, styles.fieldFlex]}>
+                          <Text style={styles.label}>{t('profileExpMonth')}</Text>
+                          <TextInput
+                            style={[styles.input, isDark && darkStyles.input]}
+                            value={mesExpiracion}
+                            onChangeText={setMesExpiracion}
+                            keyboardType="number-pad"
+                            maxLength={2}
+                            placeholder="MM"
+                            placeholderTextColor="#b0c8a0"
+                          />
+                        </View>
+                        <View style={[styles.fieldGroup, styles.fieldFlex]}>
+                          <Text style={styles.label}>{t('profileExpYear')}</Text>
+                          <TextInput
+                            style={[styles.input, isDark && darkStyles.input]}
+                            value={anioExpiracion}
+                            onChangeText={setAnioExpiracion}
+                            keyboardType="number-pad"
+                            maxLength={4}
+                            placeholder="AAAA"
+                            placeholderTextColor="#b0c8a0"
+                          />
+                        </View>
+                      </View>
+                      <View style={styles.inlineFormActions}>
+                        <Pressable
+                          style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}
+                          onPress={() => setAddCardVisible(false)}>
+                          <Text style={styles.cancelBtnText}>{t('cancel')}</Text>
+                        </Pressable>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.saveButton,
+                            styles.inlineSaveBtn,
+                            (pressed || savingCard) && styles.pressed,
+                          ]}
+                          onPress={handleAddCard}
+                          disabled={savingCard}>
+                          <Text style={styles.saveButtonText}>
+                            {savingCard ? t('saving') : t('profileAddCardFull')}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                {/* Seguridad */}
+                <View style={[styles.card, isDark && darkStyles.card]}>
+                  <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                    {t('profileSecurity')}
+                  </Text>
+                  <Text style={styles.securityDesc}>{t('profileSecurityDesc')}</Text>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.label}>{t('currentPassword')}</Text>
+                    <TextInput
+                      style={[styles.input, isDark && darkStyles.input]}
+                      value={currentPassword}
+                      onChangeText={setCurrentPassword}
+                      secureTextEntry
+                      placeholder="••••••••"
+                      placeholderTextColor="#b0c8a0"
+                    />
+                  </View>
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.label}>{t('newPassword')}</Text>
+                    <TextInput
+                      style={[styles.input, isDark && darkStyles.input]}
+                      value={newPassword}
+                      onChangeText={setNewPassword}
+                      secureTextEntry
+                      placeholder={t('newPasswordPlaceholder')}
+                      placeholderTextColor="#b0c8a0"
+                    />
+                  </View>
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.label}>{t('confirmPassword')}</Text>
+                    <TextInput
+                      style={[styles.input, isDark && darkStyles.input]}
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      secureTextEntry
+                      placeholder={t('confirmPasswordPlaceholder')}
+                      placeholderTextColor="#b0c8a0"
+                    />
+                  </View>
+
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.saveButton,
+                      (pressed || savingPassword) && styles.pressed,
+                    ]}
+                    onPress={handleChangePassword}
+                    disabled={savingPassword}>
+                    <Text style={styles.saveButtonText}>
+                      {savingPassword ? t('saving') : t('profileChangePasswordFull')}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* Informacion del sistema */}
+                <View style={[styles.card, isDark && darkStyles.card]}>
+                  <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
+                    {t('profileSystemInfo')}
+                  </Text>
+                  <Pressable
+                    style={({ pressed }) => [styles.systemInfoRow, pressed && styles.pressed]}
+                    onPress={() => router.push('/sobre-nosotros')}>
+                    <Text style={[styles.systemInfoText, isDark && darkStyles.cardTitle]}>
+                      {t('profileSystemInfoDesc')}
+                    </Text>
+                    <Text style={styles.systemInfoChevron}>›</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+          </View>
+
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Selector de sexo */}
+      <Modal
+        visible={genderModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGenderModalVisible(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setGenderModalVisible(false)} />
+        <View style={[styles.genderModal, isDark && darkStyles.card]}>
+          {GENDER_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.value}
+              style={({ pressed }) => [styles.genderOption, pressed && styles.pressed]}
+              onPress={() => {
+                setSexo(opt.value);
+                setGenderModalVisible(false);
+              }}>
+              <Text style={[styles.genderOptionText, isDark && darkStyles.cardTitle]}>
+                {t(opt.labelKey)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -377,17 +1057,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
+  kav: {
+    flex: 1,
+  },
   scrollOuter: {
     flexGrow: 1,
     paddingBottom: 40,
     backgroundColor: '#ffffff',
   },
 
-  /* Header en degradado */
+  /* Encabezado */
   header: {
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 56,
+    paddingBottom: 28,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
     overflow: 'hidden',
@@ -402,10 +1086,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   headerTopRow: {
+    width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 14,
   },
   menuButton: {
     width: 40,
@@ -415,9 +1100,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  menuButtonIcon: {
-    color: '#ffffff',
-    fontSize: 22,
+  hamburgerIcon: {
+    width: 20,
+    height: 14,
+    justifyContent: 'space-between',
+  },
+  hamburgerBar: {
+    height: 2.4,
+    borderRadius: 2,
+    backgroundColor: '#ffffff',
+    width: '100%',
+  },
+  hamburgerBarMid: {
+    width: '70%',
   },
   pressed: {
     opacity: 0.75,
@@ -477,65 +1172,71 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
   },
-  greetingText: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  nameText: {
+  headerTitle: {
     color: '#ffffff',
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '800',
-    marginTop: 2,
-    letterSpacing: -0.5,
   },
-  dateText: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
+  headerSubtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    textAlign: 'center',
     marginTop: 4,
-    textTransform: 'capitalize',
+    marginBottom: 14,
+    lineHeight: 18,
+    paddingHorizontal: 8,
   },
   avatarCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowRadius: 8,
+    elevation: 6,
+    marginBottom: 8,
   },
-  avatarLetter: {
+  avatarInitial: {
     color: '#2E7D32',
-    fontSize: 18,
+    fontSize: 34,
     fontWeight: '800',
   },
-
-  /* Contenido */
-  content: {
-    paddingHorizontal: 20,
-    gap: 12,
+  nameText: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
   },
-  floatingCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 22,
-    padding: 18,
-    gap: 12,
-    marginTop: -40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 6,
+  emailBadge: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    marginTop: 2,
   },
-  floatingCardTitle: {
-    color: '#1a2e1a',
-    fontSize: 15,
+  rolePill: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginTop: 6,
+  },
+  rolePillText: {
+    color: '#ffffff',
+    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 0.2,
+  },
+  phoneCountryText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    marginTop: 6,
+  },
+  memberSince: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12,
+    marginTop: 8,
   },
 
   /* Hamburger menu */
@@ -545,21 +1246,25 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
-  menuPanel: {
+  menuPanelWrap: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     left: 0,
-    width: '80%',
-    maxWidth: 320,
-    backgroundColor: '#ffffff',
     shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  menuPanel: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderTopRightRadius: 26,
+    borderBottomRightRadius: 26,
+    overflow: 'hidden',
   },
   menuHeader: {
     paddingHorizontal: 20,
@@ -576,6 +1281,9 @@ const styles = StyleSheet.create({
     height: 130,
     borderRadius: 65,
     backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  menuHeaderLogo: {
+    marginBottom: 14,
   },
   menuAvatarCircle: {
     width: 52,
@@ -604,24 +1312,36 @@ const styles = StyleSheet.create({
   menuBody: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 20,
+  },
+  menuSectionLabel: {
+    color: '#9aa89a',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 10,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    paddingVertical: 10,
+    marginBottom: 4,
+    borderRadius: 14,
+    paddingHorizontal: 6,
   },
   menuItemPressed: {
     backgroundColor: '#f7fbf3',
+    transform: [{ scale: 0.98 }],
   },
-  menuItemDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: '#4EC920',
+  menuItemIconBubble: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   menuItemText: {
     flex: 1,
@@ -651,78 +1371,136 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  /* Section titles */
-  sectionTitle: {
-    color: '#1a2e1a',
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: 4,
-    letterSpacing: 0.2,
+  /* Iconos del menú */
+  miCapsuleWrap: {
+    flexDirection: 'row',
+    width: 18,
+    height: 10,
+    borderRadius: 5,
+    overflow: 'hidden',
+    transform: [{ rotate: '-30deg' }],
+  },
+  miCapsuleHalf: {
+    flex: 1,
+  },
+  miBasketWrap: {
+    width: 20,
+    height: 18,
+    alignItems: 'center',
+  },
+  miBasketHandle: {
+    position: 'absolute',
+    top: 0,
+    width: 11,
+    height: 8,
+    borderWidth: 2,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+  },
+  miBasketBody: {
+    width: 18,
+    height: 12,
+    borderRadius: 4,
+    marginTop: 6,
+  },
+  miInfoWrap: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    gap: 3,
+  },
+  miInfoDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  miInfoBar: {
+    width: 4,
+    height: 9,
+    borderRadius: 2,
+  },
+  miTargetWrap: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miTargetRing: {
+    position: 'absolute',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+  },
+  miTargetDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  miGearWrap: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miGearRing: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+  },
+  miGearNotchH: {
+    position: 'absolute',
+    width: 18,
+    height: 2.4,
+    borderRadius: 2,
+  },
+  miGearNotchV: {
+    position: 'absolute',
+    width: 2.4,
+    height: 18,
+    borderRadius: 2,
   },
 
-  /* Stat grid */
-  statsGrid: {
+  /* Contenido */
+  content: {
+    paddingHorizontal: 20,
+    gap: 14,
+    marginTop: 16,
+  },
+  statsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 10,
   },
-  statCard: {
+  statBox: {
     flex: 1,
-    minWidth: '45%',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#ffffff',
     borderRadius: 16,
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 6,
     alignItems: 'center',
-    gap: 2,
     borderWidth: 1,
-    borderColor: '#e8e8e8',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statCardAccent: {
-    backgroundColor: '#4EC920',
-    borderColor: '#4EC920',
-    shadowColor: '#4EC920',
-    shadowOpacity: 0.3,
-    elevation: 4,
+    borderColor: '#ebebeb',
   },
   statValue: {
     color: '#1a2e1a',
-    fontSize: 32,
+    fontSize: 22,
     fontWeight: '800',
-    lineHeight: 36,
-  },
-  statValueAccent: {
-    color: '#ffffff',
-  },
-  statUnit: {
-    color: '#888',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  statUnitAccent: {
-    color: 'rgba(255,255,255,0.8)',
   },
   statLabel: {
-    color: '#555',
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 4,
+    color: '#888',
+    fontSize: 11,
+    marginTop: 2,
     textAlign: 'center',
   },
-  statLabelAccent: {
-    color: 'rgba(255,255,255,0.9)',
-  },
 
-  /* Generic card */
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 18,
-    gap: 10,
+    borderRadius: 18,
+    padding: 20,
+    gap: 14,
     borderWidth: 1,
     borderColor: '#ebebeb',
     shadowColor: '#000',
@@ -731,42 +1509,180 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-
-  /* Progress bar */
-  progressHeader: {
+  cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  progressLabel: {
-    color: '#555',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  progressPct: {
-    color: '#4EC920',
-    fontSize: 17,
+  cardTitle: {
+    color: '#1a2e1a',
+    fontSize: 18,
     fontWeight: '800',
   },
-  progressTrack: {
-    height: 10,
-    backgroundColor: '#eee',
-    borderRadius: 5,
-    overflow: 'hidden',
+  smallBtn: {
+    backgroundColor: '#f0f9e8',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#d4edbc',
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#4EC920',
-    borderRadius: 5,
-  },
-  progressSub: {
-    color: '#888',
+  smallBtnText: {
+    color: '#2E7D32',
     fontSize: 12,
-    textAlign: 'center',
-    marginTop: 2,
+    fontWeight: '700',
   },
 
-  /* Activity list */
+  fieldGroup: {
+    gap: 5,
+  },
+  fieldRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  fieldFlex: {
+    flex: 1,
+  },
+  label: {
+    color: '#2E7D32',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  input: {
+    backgroundColor: '#f7f9f5',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    fontSize: 15,
+    color: '#1a2e1a',
+    borderWidth: 1,
+    borderColor: '#d4edbc',
+  },
+  selectBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f7f9f5',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: '#d4edbc',
+  },
+  selectBoxText: {
+    fontSize: 15,
+    color: '#1a2e1a',
+  },
+  selectBoxChevron: {
+    color: '#2E7D32',
+    fontSize: 14,
+  },
+  saveButton: {
+    backgroundColor: '#2E7D32',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
+    shadowColor: '#2E7D32',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  saveButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 4,
+  },
+  emptyTitle: {
+    color: '#1a2e1a',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  emptyDesc: {
+    color: '#888',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  emptyCta: {
+    color: '#2E7D32',
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 8,
+  },
+
+  listGroup: {
+    gap: 8,
+  },
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    backgroundColor: '#f7f7f7',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  listRowText: {
+    flex: 1,
+    color: '#333',
+    fontSize: 13,
+  },
+  listRowDelete: {
+    color: '#e05050',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  inlineForm: {
+    gap: 12,
+    marginTop: 6,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  inlineFormActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  cancelBtn: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    color: '#888',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  inlineSaveBtn: {
+    flex: 1,
+    marginTop: 0,
+  },
+
+  securityDesc: {
+    color: '#777',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: -6,
+  },
+
+  /* Actividad reciente */
   activityRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -809,33 +1725,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#b6f088',
   },
-  badgeText: {
-    color: '#4EC920',
-    fontSize: 12,
+
+  /* Informacion del sistema */
+  systemInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f7f9f5',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#eef3ea',
+  },
+  systemInfoText: {
+    color: '#1a2e1a',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  systemInfoChevron: {
+    color: '#2E7D32',
+    fontSize: 18,
     fontWeight: '700',
   },
-  emptyText: {
-    color: '#bbb',
-    fontSize: 13,
-    textAlign: 'center',
-    paddingVertical: 12,
-  },
 
-  /* Loading / error */
   loadingBox: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    paddingTop: 80,
-  },
-  loadingText: {
-    color: '#888',
-    fontSize: 14,
+    paddingVertical: 40,
   },
   errorBox: {
     alignItems: 'center',
-    paddingTop: 80,
+    paddingVertical: 40,
     gap: 10,
   },
   errorTitle: {
@@ -860,6 +1781,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+
+  /* Modal de sexo */
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  genderModal: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    top: '40%',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 8,
+    gap: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  genderOption: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  genderOptionText: {
+    color: '#1a2e1a',
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });
 
 /* Overrides para modo oscuro */
@@ -877,18 +1833,29 @@ const darkStyles = StyleSheet.create({
   cardTitle: {
     color: '#f2f2f2',
   },
-  statCard: {
-    backgroundColor: '#1e1e1e',
-    borderColor: '#2a2a2a',
+  cardSubtitle: {
+    color: '#9a9a9a',
   },
-  statValue: {
+  readonlyBox: {
+    backgroundColor: '#262626',
+    borderColor: '#333',
+  },
+  readonlyText: {
+    color: '#ddd',
+  },
+  input: {
+    backgroundColor: '#262626',
+    borderColor: '#3a4a33',
     color: '#f2f2f2',
   },
   menuPanel: {
     backgroundColor: '#1e1e1e',
   },
+  menuSectionLabel: {
+    color: '#6f7d6f',
+  },
   menuItem: {
-    borderBottomColor: '#2a2a2a',
+    backgroundColor: 'transparent',
   },
   menuItemText: {
     color: '#f2f2f2',

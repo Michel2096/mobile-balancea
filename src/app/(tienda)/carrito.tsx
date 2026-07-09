@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,18 +15,30 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { getUser, ordenesApi, direccionesApi, Direccion } from '@/services/api';
+import { Ionicons } from '@expo/vector-icons';
+import { getUser, ordenesApi, direccionesApi, Direccion, AddDireccionPayload } from '@/services/api';
 import { clearCart, getCartCount, getCartTotal, removeFromCart, setQuantity, useCart } from '@/services/cart';
+import { refreshUnreadCount } from '@/services/notifications';
 import { useAppPreferences } from '@/context/app-preferences';
+import { CheckoutStepper } from '@/components/checkout/CheckoutStepper';
+import { AddressList } from '@/components/checkout/AddressList';
+import { AddressFormModal } from '@/components/checkout/AddressFormModal';
+import { addressTypeInfo } from '@/components/checkout/AddressCard';
+import { PaymentMethodCard } from '@/components/checkout/PaymentMethodCard';
+import { OrderSummaryCard } from '@/components/checkout/OrderSummaryCard';
+import { CheckoutNavButtons } from '@/components/checkout/CheckoutNavButtons';
+import { PaymentSuccessBanner } from '@/components/checkout/PaymentSuccessBanner';
 
 type Step = 1 | 2 | 3 | 4;
 type MetodoPago = 'efectivo' | 'tarjeta';
 
-const TIPO_DIRECCION_OPTIONS = [
-  { value: 'casa', labelKey: 'tipoCasa' },
-  { value: 'oficina', labelKey: 'tipoOficina' },
-  { value: 'otro', labelKey: 'tipoOtro' },
-];
+type ConfirmedOrder = {
+  codigo: string;
+  itemsCount: number;
+  total: number;
+  metodoPago: MetodoPago;
+  direccion?: Direccion;
+};
 
 function formatPrecio(precio: number) {
   return `$${precio.toFixed(2)}`;
@@ -38,6 +51,21 @@ function formatDireccion(d: Direccion) {
   );
 }
 
+// El backend responde en distintos formatos según el endpoint (a veces un
+// array plano, a veces envuelto en { direcciones: [...] } o { data: [...] }).
+// Devuelve `null` cuando la forma no se reconoce, para no confundir "sin
+// direcciones" con "no se pudo interpretar la respuesta".
+function extractDireccionesArray(raw: unknown): Direccion[] | null {
+  if (Array.isArray(raw)) return raw as Direccion[];
+  if (raw && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    if (Array.isArray(obj.direcciones)) return obj.direcciones as Direccion[];
+    if (Array.isArray(obj.data)) return obj.data as Direccion[];
+    if (Array.isArray(obj.results)) return obj.results as Direccion[];
+  }
+  return null;
+}
+
 function BasketIcon() {
   return (
     <View style={styles.basketIconWrap}>
@@ -47,49 +75,57 @@ function BasketIcon() {
   );
 }
 
-function StepIndicator({ currentStep, t }: { currentStep: Step; t: (key: string) => string }) {
-  const labels = [
-    t('checkoutStepCarrito'),
-    t('checkoutStepInformacion'),
-    t('checkoutStepDireccion'),
-    t('checkoutStepPago'),
-  ];
-  const fillPct = ((currentStep - 1) / (labels.length - 1)) * 100;
-
+function EmptyCartIllustration() {
   return (
-    <View style={styles.stepperWrap}>
-      <View style={styles.stepperTrack}>
-        <View style={styles.stepperBaseLine} />
-        <View style={[styles.stepperFillLine, { width: `${fillPct}%` }]} />
-        <View style={styles.stepperCirclesRow}>
-          {labels.map((_, idx) => {
-            const n = (idx + 1) as Step;
-            const done = currentStep > n;
-            const active = currentStep === n;
-            return (
-              <View
-                key={n}
-                style={[styles.stepperCircle, (done || active) && styles.stepperCircleActive]}>
-                <Text
-                  style={[styles.stepperCircleText, (done || active) && styles.stepperCircleTextActive]}>
-                  {done ? '✓' : n}
-                </Text>
-              </View>
-            );
-          })}
+    <View style={styles.illustrationWrap}>
+      <View style={styles.illustrationRingOuter} />
+      <View style={styles.illustrationRingInner}>
+        <View style={styles.illustrationBasketHandle} />
+        <View style={styles.illustrationBasketBody}>
+          <View style={styles.illustrationBasketLine} />
+          <View style={styles.illustrationBasketLine} />
+          <View style={styles.illustrationBasketLine} />
         </View>
       </View>
-      <View style={styles.stepperLabelsRow}>
-        {labels.map((label, idx) => (
-          <Text
-            key={label}
-            style={[styles.stepperLabel, currentStep === idx + 1 && styles.stepperLabelActive]}
-            numberOfLines={1}>
-            {label}
-          </Text>
-        ))}
-      </View>
+      <View style={[styles.illustrationDot, styles.illustrationDotTopRight]} />
+      <View style={[styles.illustrationDot, styles.illustrationDotBottomLeft]} />
     </View>
+  );
+}
+
+function EmptyCartCard({ t, isDark }: { t: (key: string) => string; isDark: boolean }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 420,
+      useNativeDriver: true,
+    }).start();
+  }, [anim]);
+
+  const animatedStyle = {
+    opacity: anim,
+    transform: [
+      { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) },
+      { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
+    ],
+  };
+
+  return (
+    <Animated.View style={[styles.emptyCard, isDark && darkStyles.card, animatedStyle]}>
+      <EmptyCartIllustration />
+      <Text style={[styles.emptyTitle, isDark && darkStyles.cardTitle]}>
+        {t('carritoEmptyTitle')}
+      </Text>
+      <Text style={styles.emptyText}>{t('carritoEmptyDesc')}</Text>
+      <Pressable
+        style={({ pressed }) => [styles.emptyBtn, pressed && styles.emptyBtnPressed]}
+        onPress={() => router.push('/productos')}>
+        <Text style={styles.emptyBtnText}>{t('verProductos')}</Text>
+        <Text style={styles.emptyBtnArrow}>→</Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -103,25 +139,21 @@ export default function CarritoScreen() {
   const [step, setStep] = useState<Step>(1);
 
   // Paso 3: Dirección
-  const [direcciones, setDirecciones] = useState<Direccion[]>(user?.direcciones ?? []);
+  const [direcciones, setDirecciones] = useState<Direccion[]>(
+    Array.isArray(user?.direcciones) ? user.direcciones : []
+  );
   const [loadingDirecciones, setLoadingDirecciones] = useState(false);
   const [selectedDireccionId, setSelectedDireccionId] = useState<number | string | null>(null);
   const [showNewAddressForm, setShowNewAddressForm] = useState(false);
-  const [calle, setCalle] = useState('');
-  const [numeroExterior, setNumeroExterior] = useState('');
-  const [numeroInterior, setNumeroInterior] = useState('');
-  const [colonia, setColonia] = useState('');
-  const [ciudad, setCiudad] = useState('');
-  const [estado, setEstado] = useState('');
-  const [codigoPostal, setCodigoPostal] = useState('');
-  const [tipoDireccion, setTipoDireccion] = useState('casa');
-  const [referencias, setReferencias] = useState('');
   const [savingDireccion, setSavingDireccion] = useState(false);
 
   // Paso 4: Pago
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('efectivo');
   const [notas, setNotas] = useState('');
   const [placing, setPlacing] = useState(false);
+  const [confirmedOrder, setConfirmedOrder] = useState<ConfirmedOrder | null>(null);
+
+  const direccionSeleccionada = direcciones.find((d) => d.id === selectedDireccionId);
 
   useEffect(() => {
     if (step === 3) fetchDirecciones();
@@ -130,10 +162,16 @@ export default function CarritoScreen() {
   async function fetchDirecciones() {
     setLoadingDirecciones(true);
     try {
-      const data = await direccionesApi.getMine();
-      setDirecciones(data);
-      if (data.length > 0) {
-        setSelectedDireccionId((prev) => prev ?? (data.find((d) => d.predeterminada) ?? data[0]).id);
+      const raw: unknown = await direccionesApi.getMine();
+      const lista = extractDireccionesArray(raw);
+      if (lista === null) {
+        // Forma de respuesta irreconocible: no pisamos las direcciones ya
+        // cargadas (p. ej. las que vinieron con el perfil del usuario).
+        return;
+      }
+      setDirecciones(lista);
+      if (lista.length > 0) {
+        setSelectedDireccionId((prev) => prev ?? (lista.find((d) => d.predeterminada) ?? lista[0]).id);
       } else {
         setShowNewAddressForm(true);
       }
@@ -144,40 +182,13 @@ export default function CarritoScreen() {
     }
   }
 
-  function resetNewAddressForm() {
-    setCalle('');
-    setNumeroExterior('');
-    setNumeroInterior('');
-    setColonia('');
-    setCiudad('');
-    setEstado('');
-    setCodigoPostal('');
-    setReferencias('');
-    setTipoDireccion('casa');
-  }
-
-  async function handleAddAddress() {
-    if (!calle.trim() || !numeroExterior.trim() || !colonia.trim() || !ciudad.trim() || !estado.trim() || !codigoPostal.trim()) {
-      Alert.alert(t('requiredFieldsTitle'), t('requiredFieldsMsg'));
-      return;
-    }
+  async function handleAddAddress(values: AddDireccionPayload) {
     setSavingDireccion(true);
     try {
-      const nueva = await direccionesApi.add({
-        calle: calle.trim(),
-        numero_exterior: numeroExterior.trim(),
-        numero_interior: numeroInterior.trim() || undefined,
-        colonia: colonia.trim(),
-        ciudad: ciudad.trim(),
-        estado: estado.trim(),
-        codigo_postal: codigoPostal.trim(),
-        referencias: referencias.trim() || undefined,
-        tipo: tipoDireccion,
-      });
+      const nueva = await direccionesApi.add(values);
       setDirecciones((prev) => [...prev, nueva]);
       setSelectedDireccionId(nueva.id);
       setShowNewAddressForm(false);
-      resetNewAddressForm();
     } catch (err: unknown) {
       Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('profileAddressError'));
     } finally {
@@ -206,7 +217,10 @@ export default function CarritoScreen() {
       Alert.alert(t('errorTitle'), t('carritoLoginRequired'));
       return;
     }
-    const direccionSeleccionada = direcciones.find((d) => d.id === selectedDireccionId);
+    if (!direccionSeleccionada) {
+      Alert.alert(t('direccionRequeridaTitle'), t('direccionRequeridaMsg'));
+      return;
+    }
     setPlacing(true);
     try {
       const res = await ordenesApi.createCarrito({
@@ -224,12 +238,16 @@ export default function CarritoScreen() {
         direccion_id: direccionSeleccionada?.id,
         direccion_texto: direccionSeleccionada ? formatDireccion(direccionSeleccionada) : undefined,
       });
+      const resumen: ConfirmedOrder = {
+        codigo: res.orden.codigo_unico,
+        itemsCount: count,
+        total,
+        metodoPago,
+        direccion: direccionSeleccionada,
+      };
       clearCart();
-      Alert.alert(
-        t('pedidoConfirmadoTitle'),
-        t('pedidoConfirmadoMsg', { codigo: res.orden.codigo_unico }),
-        [{ text: t('aceptar'), onPress: () => router.replace('/(tabs)') }]
-      );
+      if (res.notificaciones_generadas) refreshUnreadCount();
+      setConfirmedOrder(resumen);
     } catch (err: unknown) {
       Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('pedidoError'));
     } finally {
@@ -237,25 +255,25 @@ export default function CarritoScreen() {
     }
   }
 
-  const headerTitle =
-    step === 1
-      ? t('carritoTitle')
-      : step === 2
-      ? t('informacionPersonalTitle')
-      : step === 3
-      ? t('direccionEntregaTitle')
-      : t('metodoPagoTitle');
+  const headerTitle = confirmedOrder
+    ? t('pedidoExitosoTitle')
+    : step === 1
+    ? t('carritoTitle')
+    : step === 2
+    ? t('informacionPersonalTitle')
+    : step === 3
+    ? t('checkoutStepDireccion')
+    : t('metodoPagoTitle');
 
-  const headerSubtitle =
-    step === 1
-      ? count === 0
-        ? t('carritoEmptySubtitle')
-        : t('carritoHeaderCount', { count })
-      : step === 2
-      ? t('informacionPersonalSubtitle')
-      : step === 3
-      ? t('direccionEntregaSubtitle')
-      : undefined;
+  const headerSubtitle = confirmedOrder
+    ? undefined
+    : step === 1
+    ? count === 0
+      ? t('carritoEmptySubtitle')
+      : t('carritoHeaderCount', { count })
+    : step === 2
+    ? t('informacionPersonalSubtitle')
+    : undefined;
 
   return (
     <SafeAreaView style={[styles.safeArea, isDark && darkStyles.safeArea]}>
@@ -273,11 +291,20 @@ export default function CarritoScreen() {
             style={styles.header}>
             <View pointerEvents="none" style={styles.headerBlob} />
 
-            <Pressable
-              style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
-              onPress={() => router.push('/productos')}>
-              <Text style={styles.backBtnText}>{t('seguirComprando')}</Text>
-            </Pressable>
+            <View style={styles.headerNavRow}>
+              <Pressable
+                style={({ pressed }) => [styles.backIconBtn, pressed && styles.pressed]}
+                hitSlop={10}
+                onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}>
+                <Text style={styles.backIconBtnText}>←</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
+                onPress={() => router.push('/productos')}>
+                <Text style={styles.backBtnText}>{t('seguirComprando')}</Text>
+              </Pressable>
+            </View>
 
             <View style={styles.headerTitleRow}>
               <BasketIcon />
@@ -285,24 +312,69 @@ export default function CarritoScreen() {
             </View>
             {headerSubtitle ? <Text style={styles.subtitle}>{headerSubtitle}</Text> : null}
 
-            <StepIndicator currentStep={step} t={t} />
+            {!confirmedOrder && (
+              <CheckoutStepper
+                currentStep={step}
+                labels={[
+                  t('checkoutStepCarrito'),
+                  t('checkoutStepInformacion'),
+                  t('checkoutStepDireccion'),
+                  t('checkoutStepPago'),
+                ]}
+              />
+            )}
           </LinearGradient>
 
           <View style={styles.content}>
-            {step === 1 && (
+            {confirmedOrder ? (
+              <>
+                <PaymentSuccessBanner codigo={confirmedOrder.codigo} isDark={isDark} t={t} />
+
+                <OrderSummaryCard
+                  title={t('resumenPedido')}
+                  isDark={isDark}
+                  rows={[
+                    {
+                      key: 'items',
+                      label: t('suplementosLabel', { count: confirmedOrder.itemsCount }),
+                      value: formatPrecio(confirmedOrder.total),
+                    },
+                    { key: 'envio', label: t('envioLabel'), value: t('envioGratisValor'), emphasis: 'free' },
+                    {
+                      key: 'metodoPago',
+                      label: t('metodoPagoResumenLabel'),
+                      value:
+                        confirmedOrder.metodoPago === 'efectivo'
+                          ? t('metodoPagoEfectivoCorto')
+                          : t('metodoPagoTarjetaCorto'),
+                    },
+                  ]}
+                  addressLine={
+                    confirmedOrder.direccion
+                      ? {
+                          label: t('direccionEntregaTitle'),
+                          value: `${t(addressTypeInfo(confirmedOrder.direccion.tipo).labelKey)} · ${formatDireccion(
+                            confirmedOrder.direccion
+                          )}`,
+                        }
+                      : undefined
+                  }
+                  totalLabel={t('totalLabel')}
+                  totalValue={formatPrecio(confirmedOrder.total)}
+                  footer={
+                    <CheckoutNavButtons
+                      onNext={() => router.replace('/(tabs)')}
+                      nextLabel={t('volverAlInicioBtn')}
+                    />
+                  }
+                />
+              </>
+            ) : (
+              <>
+                {step === 1 && (
               <>
                 {items.length === 0 ? (
-                  <View style={[styles.floatingCard, isDark && darkStyles.card]}>
-                    <Text style={[styles.emptyTitle, isDark && darkStyles.cardTitle]}>
-                      {t('carritoEmptyTitle')}
-                    </Text>
-                    <Text style={styles.emptyText}>{t('carritoEmptyDesc')}</Text>
-                    <Pressable
-                      style={({ pressed }) => [styles.emptyBtn, pressed && styles.pressed]}
-                      onPress={() => router.push('/productos')}>
-                      <Text style={styles.emptyBtnText}>{t('verProductos')}</Text>
-                    </Pressable>
-                  </View>
+                  <EmptyCartCard t={t} isDark={isDark} />
                 ) : (
                   <>
                     <View style={[styles.floatingCard, isDark && darkStyles.card]}>
@@ -353,47 +425,37 @@ export default function CarritoScreen() {
                             style={({ pressed }) => [styles.removeBtn, pressed && styles.pressed]}
                             onPress={() => removeFromCart(item.suplementoId)}
                             hitSlop={8}>
-                            <Text style={styles.removeBtnText}>✕</Text>
+                            <Ionicons name="close" size={14} color="#c9c9c9" />
                           </Pressable>
                         </View>
                       ))}
                     </View>
 
-                    <View style={[styles.summaryCard, isDark && darkStyles.card]}>
-                      <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
-                        {t('resumenPedido')}
-                      </Text>
-                      <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>{t('suplementosLabel', { count })}</Text>
-                        <Text style={styles.summaryValue}>{formatPrecio(total)}</Text>
-                      </View>
-                      <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>{t('costoEnvio')}</Text>
-                        <Text style={styles.summaryValueFree}>{t('envioGratisValor')}</Text>
-                      </View>
-                      <View style={styles.summaryDivider} />
-                      <View style={styles.summaryRow}>
-                        <Text style={styles.summaryTotalLabel}>{t('totalPagar')}</Text>
-                        <Text style={styles.summaryTotal}>{formatPrecio(total)}</Text>
-                      </View>
-                      <Pressable
-                        style={({ pressed }) => [styles.confirmBtn, pressed && styles.pressed]}
-                        onPress={() => setStep(2)}>
-                        <Text style={styles.confirmBtnText}>{t('continuarConPedido')}</Text>
-                      </Pressable>
-                    </View>
+                    <OrderSummaryCard
+                      title={t('resumenPedido')}
+                      isDark={isDark}
+                      rows={[
+                        { key: 'items', label: t('suplementosLabel', { count }), value: formatPrecio(total) },
+                        { key: 'envio', label: t('costoEnvio'), value: t('envioGratisValor'), emphasis: 'free' },
+                      ]}
+                      totalLabel={t('totalPagar')}
+                      totalValue={formatPrecio(total)}
+                      footer={
+                        <CheckoutNavButtons onNext={() => setStep(2)} nextLabel={t('continuarConPedido')} />
+                      }
+                    />
 
                     <View style={styles.trustList}>
                       <View style={styles.trustRow}>
-                        <View style={styles.trustCheck}><Text style={styles.trustCheckText}>✓</Text></View>
+                        <View style={styles.trustCheck}><Ionicons name="checkmark" size={11} color="#2E7D32" /></View>
                         <Text style={styles.trustText}>{t('trustEnvioGratis')}</Text>
                       </View>
                       <View style={styles.trustRow}>
-                        <View style={styles.trustCheck}><Text style={styles.trustCheckText}>✓</Text></View>
+                        <View style={styles.trustCheck}><Ionicons name="checkmark" size={11} color="#2E7D32" /></View>
                         <Text style={styles.trustText}>{t('trustEntregaGarantizada')}</Text>
                       </View>
                       <View style={styles.trustRow}>
-                        <View style={styles.trustCheck}><Text style={styles.trustCheckText}>✓</Text></View>
+                        <View style={styles.trustCheck}><Ionicons name="checkmark" size={11} color="#2E7D32" /></View>
                         <Text style={styles.trustText}>{t('trustPagoFlexible')}</Text>
                       </View>
                     </View>
@@ -424,258 +486,80 @@ export default function CarritoScreen() {
                   <Text style={styles.helperText}>{t('obtenidoDePerfil')}</Text>
                 </View>
 
-                <View style={styles.stepButtonsRow}>
-                  <Pressable
-                    style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
-                    onPress={() => setStep(1)}>
-                    <Text style={styles.secondaryBtnText}>{t('prevStep')}</Text>
-                  </Pressable>
-                  <Pressable
-                    style={({ pressed }) => [styles.primaryBtn, styles.primaryBtnFlex, pressed && styles.pressed]}
-                    onPress={handleContinueToDireccion}>
-                    <Text style={styles.primaryBtnText}>{t('continuarADireccion')}</Text>
-                  </Pressable>
-                </View>
+                <CheckoutNavButtons
+                  onBack={() => setStep(1)}
+                  backLabel={t('prevStep')}
+                  onNext={handleContinueToDireccion}
+                  nextLabel={t('continuarADireccion')}
+                />
               </View>
             )}
 
             {step === 3 && (
               <View style={[styles.floatingCard, isDark && darkStyles.card]}>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, isDark && darkStyles.cardTitle]}>
+                    {t('direccionEntregaTitle')}
+                  </Text>
+                  <Text style={styles.sectionSubtitle}>{t('direccionEntregaSubtitle')}</Text>
+                </View>
+
                 {loadingDirecciones ? (
                   <View style={styles.loadingBox}>
                     <ActivityIndicator size="small" color="#4EC920" />
                   </View>
                 ) : (
-                  <>
-                    {direcciones.length > 0 && (
-                      <>
-                        <View style={styles.cardHeaderRow}>
-                          <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
-                            {t('misDireccionesLabel')}
-                          </Text>
-                          {!showNewAddressForm && (
-                            <Pressable
-                              style={({ pressed }) => [styles.smallBtn, pressed && styles.pressed]}
-                              onPress={() => setShowNewAddressForm(true)}>
-                              <Text style={styles.smallBtnText}>{t('agregarNuevaDireccionBtn')}</Text>
-                            </Pressable>
-                          )}
-                        </View>
-
-                        {!showNewAddressForm && (
-                          <View style={styles.addressList}>
-                            {direcciones.map((d) => {
-                              const active = selectedDireccionId === d.id;
-                              return (
-                                <Pressable
-                                  key={d.id}
-                                  style={[styles.addressCard, active && styles.addressCardActive]}
-                                  onPress={() => setSelectedDireccionId(d.id)}>
-                                  <View style={[styles.radio, active && styles.radioActive]} />
-                                  <Text
-                                    style={[styles.addressCardText, isDark && darkStyles.readonlyText]}
-                                    numberOfLines={2}>
-                                    {formatDireccion(d)}
-                                  </Text>
-                                </Pressable>
-                              );
-                            })}
-                          </View>
-                        )}
-                      </>
-                    )}
-
-                    {showNewAddressForm && (
-                      <View style={direcciones.length > 0 ? styles.inlineForm : undefined}>
-                        <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
-                          {t('nuevaDireccionTitle')}
-                        </Text>
-
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.label}>{t('profileStreet')}</Text>
-                          <TextInput
-                            style={[styles.input, isDark && darkStyles.input]}
-                            value={calle}
-                            onChangeText={setCalle}
-                            placeholder={t('campoCallePlaceholder')}
-                            placeholderTextColor="#b0c8a0"
-                          />
-                        </View>
-
-                        <View style={styles.fieldRow}>
-                          <View style={[styles.fieldGroup, styles.fieldFlex]}>
-                            <Text style={styles.label}>{t('profileExtNumber')}</Text>
-                            <TextInput
-                              style={[styles.input, isDark && darkStyles.input]}
-                              value={numeroExterior}
-                              onChangeText={setNumeroExterior}
-                              placeholder="123"
-                              placeholderTextColor="#b0c8a0"
-                            />
-                          </View>
-                          <View style={[styles.fieldGroup, styles.fieldFlex]}>
-                            <Text style={styles.label}>{t('profileIntNumber')}</Text>
-                            <TextInput
-                              style={[styles.input, isDark && darkStyles.input]}
-                              value={numeroInterior}
-                              onChangeText={setNumeroInterior}
-                              placeholder="A"
-                              placeholderTextColor="#b0c8a0"
-                            />
-                          </View>
-                        </View>
-
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.label}>{t('profileNeighborhood')}</Text>
-                          <TextInput
-                            style={[styles.input, isDark && darkStyles.input]}
-                            value={colonia}
-                            onChangeText={setColonia}
-                            placeholder={t('campoColoniaPlaceholder')}
-                            placeholderTextColor="#b0c8a0"
-                          />
-                        </View>
-
-                        <View style={styles.fieldRow}>
-                          <View style={[styles.fieldGroup, styles.fieldFlex]}>
-                            <Text style={styles.label}>{t('profileCity')}</Text>
-                            <TextInput
-                              style={[styles.input, isDark && darkStyles.input]}
-                              value={ciudad}
-                              onChangeText={setCiudad}
-                              placeholder={t('campoCiudadPlaceholder')}
-                              placeholderTextColor="#b0c8a0"
-                            />
-                          </View>
-                          <View style={[styles.fieldGroup, styles.fieldFlex]}>
-                            <Text style={styles.label}>{t('profileState')}</Text>
-                            <TextInput
-                              style={[styles.input, isDark && darkStyles.input]}
-                              value={estado}
-                              onChangeText={setEstado}
-                              placeholder={t('campoEstadoPlaceholder')}
-                              placeholderTextColor="#b0c8a0"
-                            />
-                          </View>
-                        </View>
-
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.label}>{t('profileZip')}</Text>
-                          <TextInput
-                            style={[styles.input, isDark && darkStyles.input]}
-                            value={codigoPostal}
-                            onChangeText={setCodigoPostal}
-                            keyboardType="number-pad"
-                            maxLength={5}
-                            placeholder="12345"
-                            placeholderTextColor="#b0c8a0"
-                          />
-                          <Text style={styles.helperText}>{t('campoCPHelper')}</Text>
-                        </View>
-
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.label}>{t('tipoDireccionLabel')}</Text>
-                          <View style={styles.chipsRow}>
-                            {TIPO_DIRECCION_OPTIONS.map((opt) => {
-                              const active = tipoDireccion === opt.value;
-                              return (
-                                <Pressable
-                                  key={opt.value}
-                                  style={[styles.chip, active && styles.chipActive]}
-                                  onPress={() => setTipoDireccion(opt.value)}>
-                                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                                    {t(opt.labelKey)}
-                                  </Text>
-                                </Pressable>
-                              );
-                            })}
-                          </View>
-                        </View>
-
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.label}>{t('referenciasOpcional')}</Text>
-                          <TextInput
-                            style={[styles.input, isDark && darkStyles.input]}
-                            value={referencias}
-                            onChangeText={setReferencias}
-                            placeholder={t('referenciasPlaceholder')}
-                            placeholderTextColor="#b0c8a0"
-                            multiline
-                          />
-                        </View>
-
-                        <View style={styles.inlineFormActions}>
-                          {direcciones.length > 0 && (
-                            <Pressable
-                              style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}
-                              onPress={() => setShowNewAddressForm(false)}>
-                              <Text style={styles.cancelBtnText}>{t('cancel')}</Text>
-                            </Pressable>
-                          )}
-                          <Pressable
-                            style={({ pressed }) => [
-                              styles.saveAddressBtn,
-                              (pressed || savingDireccion) && styles.pressed,
-                            ]}
-                            disabled={savingDireccion}
-                            onPress={handleAddAddress}>
-                            {savingDireccion ? (
-                              <ActivityIndicator color="#ffffff" />
-                            ) : (
-                              <Text style={styles.primaryBtnText}>{t('guardarDireccionBtn')}</Text>
-                            )}
-                          </Pressable>
-                        </View>
-                      </View>
-                    )}
-                  </>
+                  <AddressList
+                    direcciones={direcciones}
+                    selectedId={selectedDireccionId}
+                    onSelect={setSelectedDireccionId}
+                    onAddPress={() => setShowNewAddressForm(true)}
+                    isDark={isDark}
+                    t={t}
+                  />
                 )}
 
-                <View style={styles.stepButtonsRow}>
-                  <Pressable
-                    style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
-                    onPress={() => setStep(2)}>
-                    <Text style={styles.secondaryBtnText}>{t('prevStep')}</Text>
-                  </Pressable>
-                  <Pressable
-                    style={({ pressed }) => [styles.primaryBtn, styles.primaryBtnFlex, pressed && styles.pressed]}
-                    onPress={handleContinueToPago}>
-                    <Text style={styles.primaryBtnText}>{t('continuarAPago')}</Text>
-                  </Pressable>
-                </View>
+                <CheckoutNavButtons
+                  onBack={() => setStep(2)}
+                  backLabel={t('prevStep')}
+                  onNext={handleContinueToPago}
+                  nextLabel={t('continuarAPago')}
+                  disabled={selectedDireccionId == null}
+                />
               </View>
             )}
+
+            <AddressFormModal
+              visible={showNewAddressForm}
+              saving={savingDireccion}
+              isDark={isDark}
+              t={t}
+              onClose={() => setShowNewAddressForm(false)}
+              onSave={handleAddAddress}
+            />
 
             {step === 4 && (
               <>
                 <View style={[styles.floatingCard, isDark && darkStyles.card]}>
-                  <Pressable
-                    style={[styles.paymentCard, metodoPago === 'efectivo' && styles.paymentCardActive]}
-                    onPress={() => setMetodoPago('efectivo')}>
-                    <View style={[styles.radio, metodoPago === 'efectivo' && styles.radioActive]} />
-                    <Text style={styles.paymentEmoji}>💵</Text>
-                    <View style={styles.paymentTextWrap}>
-                      <Text style={[styles.paymentTitle, isDark && darkStyles.cardTitle]}>
-                        {t('pagoEfectivoTitle')}
-                      </Text>
-                      <Text style={styles.paymentSubtitle}>{t('pagoEfectivoSubtitle')}</Text>
-                      <Text style={styles.paymentDesc}>{t('pagoEfectivoDesc')}</Text>
-                    </View>
-                  </Pressable>
+                  <PaymentMethodCard
+                    icon="cash-outline"
+                    title={t('pagoEfectivoTitle')}
+                    subtitle={t('pagoEfectivoSubtitle')}
+                    description={t('pagoEfectivoDesc')}
+                    active={metodoPago === 'efectivo'}
+                    isDark={isDark}
+                    onSelect={() => setMetodoPago('efectivo')}
+                  />
 
-                  <Pressable
-                    style={[styles.paymentCard, metodoPago === 'tarjeta' && styles.paymentCardActive]}
-                    onPress={() => setMetodoPago('tarjeta')}>
-                    <View style={[styles.radio, metodoPago === 'tarjeta' && styles.radioActive]} />
-                    <Text style={styles.paymentEmoji}>💳</Text>
-                    <View style={styles.paymentTextWrap}>
-                      <Text style={[styles.paymentTitle, isDark && darkStyles.cardTitle]}>
-                        {t('pagoTarjetaTitle')}
-                      </Text>
-                      <Text style={styles.paymentSubtitle}>{t('pagoTarjetaSubtitle')}</Text>
-                      <Text style={styles.paymentDesc}>{t('pagoTarjetaDesc')}</Text>
-                    </View>
-                  </Pressable>
+                  <PaymentMethodCard
+                    icon="card-outline"
+                    title={t('pagoTarjetaTitle')}
+                    subtitle={t('pagoTarjetaSubtitle')}
+                    description={t('pagoTarjetaDesc')}
+                    active={metodoPago === 'tarjeta'}
+                    isDark={isDark}
+                    onSelect={() => setMetodoPago('tarjeta')}
+                  />
 
                   <View style={styles.fieldGroup}>
                     <Text style={styles.label}>{t('notasAdicionalesLabel')}</Text>
@@ -691,60 +575,49 @@ export default function CarritoScreen() {
                   </View>
                 </View>
 
-                <View style={[styles.summaryCard, isDark && darkStyles.card]}>
-                  <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
-                    {t('resumenPedido')}
-                  </Text>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>{t('suplementosLabel', { count })}</Text>
-                    <Text style={styles.summaryValue}>{formatPrecio(total)}</Text>
-                  </View>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>{t('envioLabel')}</Text>
-                    <Text style={styles.summaryValueFree}>{t('envioGratisValor')}</Text>
-                  </View>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>{t('metodoPagoResumenLabel')}</Text>
-                    <Text style={styles.summaryValue}>
-                      {metodoPago === 'efectivo' ? t('metodoPagoEfectivoCorto') : t('metodoPagoTarjetaCorto')}
-                    </Text>
-                  </View>
-                  <View style={styles.summaryDivider} />
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryTotalLabel}>{t('totalLabel')}</Text>
-                    <Text style={styles.summaryTotal}>{formatPrecio(total)}</Text>
-                  </View>
-
-                  <View style={styles.stepButtonsRow}>
-                    <Pressable
-                      style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
-                      onPress={() => setStep(3)}>
-                      <Text style={styles.secondaryBtnText}>{t('prevStep')}</Text>
-                    </Pressable>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.primaryBtn,
-                        styles.primaryBtnFlex,
-                        (pressed || placing) && styles.pressed,
-                      ]}
-                      disabled={placing}
-                      onPress={handleConfirmar}>
-                      {placing ? (
-                        <ActivityIndicator color="#ffffff" />
-                      ) : (
-                        <Text style={styles.primaryBtnText}>
-                          {t('finalizarPedidoBtn')} - {formatPrecio(total)}
-                        </Text>
-                      )}
-                    </Pressable>
-                  </View>
-
-                  <Text style={styles.disclaimerText}>{t('terminosDisclaimer')}</Text>
-                </View>
+                <OrderSummaryCard
+                  title={t('resumenPedido')}
+                  isDark={isDark}
+                  rows={[
+                    { key: 'items', label: t('suplementosLabel', { count }), value: formatPrecio(total) },
+                    { key: 'envio', label: t('envioLabel'), value: t('envioGratisValor'), emphasis: 'free' },
+                    {
+                      key: 'metodoPago',
+                      label: t('metodoPagoResumenLabel'),
+                      value: metodoPago === 'efectivo' ? t('metodoPagoEfectivoCorto') : t('metodoPagoTarjetaCorto'),
+                    },
+                  ]}
+                  addressLine={
+                    direccionSeleccionada
+                      ? {
+                          label: t('direccionEntregaTitle'),
+                          value: `${t(addressTypeInfo(direccionSeleccionada.tipo).labelKey)} · ${formatDireccion(
+                            direccionSeleccionada
+                          )}`,
+                        }
+                      : undefined
+                  }
+                  totalLabel={t('totalLabel')}
+                  totalValue={formatPrecio(total)}
+                  footer={
+                    <>
+                      <CheckoutNavButtons
+                        onBack={() => setStep(3)}
+                        backLabel={t('prevStep')}
+                        onNext={handleConfirmar}
+                        nextLabel={`${t('finalizarPedidoBtn')} - ${formatPrecio(total)}`}
+                        loading={placing}
+                        disabled={placing || !direccionSeleccionada}
+                      />
+                      <Text style={styles.disclaimerText}>{t('terminosDisclaimer')}</Text>
+                    </>
+                  }
+                />
+              </>
+            )}
               </>
             )}
           </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -768,8 +641,8 @@ const styles = StyleSheet.create({
   /* Encabezado */
   header: {
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 24,
+    paddingTop: 14,
+    paddingBottom: 32,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
     overflow: 'hidden',
@@ -783,13 +656,31 @@ const styles = StyleSheet.create({
     borderRadius: 90,
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
+  headerNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  backIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backIconBtnText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
   backBtn: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(255,255,255,0.16)',
     borderRadius: 16,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    marginBottom: 16,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
   },
   backBtnText: {
     color: '#ffffff',
@@ -842,80 +733,33 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 8,
   },
 
-  /* Stepper */
-  stepperWrap: {
-    marginTop: 22,
-  },
-  stepperTrack: {
-    height: 26,
-    justifyContent: 'center',
-  },
-  stepperBaseLine: {
-    position: 'absolute',
-    left: 13,
-    right: 13,
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  stepperFillLine: {
-    position: 'absolute',
-    left: 13,
-    height: 2,
-    backgroundColor: '#ffffff',
-  },
-  stepperCirclesRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
-  },
-  stepperCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepperCircleActive: {
-    backgroundColor: '#ffffff',
-  },
-  stepperCircleText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  stepperCircleTextActive: {
-    color: '#1B5E20',
-  },
-  stepperLabelsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-  stepperLabel: {
-    flex: 1,
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 10,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  stepperLabelActive: {
-    color: '#ffffff',
-    fontWeight: '800',
-  },
-
   /* Contenido */
   content: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
     paddingHorizontal: 20,
-    gap: 14,
-    marginTop: -30,
+    gap: 20,
+    marginTop: -22,
+  },
+  sectionHeader: {
+    gap: 4,
+  },
+  sectionTitle: {
+    color: '#1a2e1a',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  sectionSubtitle: {
+    color: '#888',
+    fontSize: 13,
+    lineHeight: 18,
   },
   floatingCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
-    gap: 12,
+    borderRadius: 22,
+    padding: 20,
+    gap: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
@@ -932,19 +776,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
-  smallBtn: {
-    backgroundColor: '#f0f9e8',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#d4edbc',
-  },
-  smallBtnText: {
-    color: '#2E7D32',
-    fontSize: 12,
-    fontWeight: '700',
-  },
   destructiveSmallBtn: {
     backgroundColor: '#fdecec',
     borderRadius: 10,
@@ -960,29 +791,131 @@ const styles = StyleSheet.create({
   },
 
   /* Estado vacío */
+  emptyCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    paddingVertical: 40,
+    paddingHorizontal: 28,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  illustrationWrap: {
+    width: 128,
+    height: 128,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  illustrationRingOuter: {
+    position: 'absolute',
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    backgroundColor: '#F1FAEA',
+  },
+  illustrationRingInner: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    backgroundColor: '#E8F5E9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  illustrationBasketHandle: {
+    position: 'absolute',
+    top: 16,
+    width: 28,
+    height: 18,
+    borderWidth: 3.5,
+    borderColor: '#8FCB6C',
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+  },
+  illustrationBasketBody: {
+    width: 48,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    borderWidth: 2.5,
+    borderColor: '#4EC920',
+    marginTop: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 6,
+  },
+  illustrationBasketLine: {
+    width: 28,
+    height: 2.5,
+    borderRadius: 2,
+    backgroundColor: '#cdeab8',
+  },
+  illustrationDot: {
+    position: 'absolute',
+    borderRadius: 20,
+    backgroundColor: '#cdeab8',
+  },
+  illustrationDotTopRight: {
+    width: 14,
+    height: 14,
+    top: 6,
+    right: 4,
+  },
+  illustrationDotBottomLeft: {
+    width: 9,
+    height: 9,
+    bottom: 14,
+    left: 8,
+    backgroundColor: '#4EC920',
+  },
   emptyTitle: {
     color: '#1a2e1a',
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 19,
+    fontWeight: '800',
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 4,
   },
   emptyText: {
     color: '#888',
-    fontSize: 13,
+    fontSize: 13.5,
+    lineHeight: 20,
     textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 16,
+    marginTop: 8,
+    marginBottom: 24,
+    maxWidth: 260,
   },
   emptyBtn: {
-    backgroundColor: '#4EC920',
-    borderRadius: 12,
-    paddingVertical: 14,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#4EC920',
+    borderRadius: 30,
+    paddingVertical: 15,
+    paddingHorizontal: 32,
+    shadowColor: '#4EC920',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  emptyBtnPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
   },
   emptyBtnText: {
     color: '#ffffff',
     fontSize: 15,
+    fontWeight: '700',
+  },
+  emptyBtnArrow: {
+    color: '#ffffff',
+    fontSize: 16,
     fontWeight: '700',
   },
 
@@ -1065,19 +998,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  removeBtnText: {
-    color: '#c9c9c9',
-    fontSize: 14,
-    fontWeight: '700',
-  },
 
   /* Campos genéricos */
   fieldGroup: {
-    gap: 5,
+    gap: 7,
   },
   fieldRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
   },
   fieldFlex: {
     flex: 1,
@@ -1091,10 +1019,10 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: '#f7f9f5',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
     color: '#1a2e1a',
     borderWidth: 1,
     borderColor: '#d4edbc',
@@ -1122,113 +1050,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  /* Botones de navegación entre pasos */
-  stepButtonsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
-  },
-  primaryBtn: {
-    backgroundColor: '#2E7D32',
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: 'center',
-    shadowColor: '#2E7D32',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  primaryBtnFlex: {
-    flex: 1,
-  },
-  primaryBtnText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-    textAlign: 'center',
-  },
-  secondaryBtn: {
-    flex: 1,
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  secondaryBtnText: {
-    color: '#555',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-
-  /* Resumen del pedido */
-  summaryCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 18,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: '#ebebeb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    color: '#555',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  summaryValue: {
-    color: '#1a2e1a',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  summaryValueFree: {
-    color: '#2E7D32',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: '#f0f0f0',
-    marginVertical: 2,
-  },
-  summaryTotalLabel: {
-    color: '#1a2e1a',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  summaryTotal: {
-    color: '#2E7D32',
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  confirmBtn: {
-    backgroundColor: '#2E7D32',
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginTop: 4,
-    shadowColor: '#2E7D32',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  confirmBtnText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-  },
   disclaimerText: {
     color: '#999',
     fontSize: 11,
@@ -1255,11 +1076,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  trustCheckText: {
-    color: '#2E7D32',
-    fontSize: 11,
-    fontWeight: '800',
-  },
   trustText: {
     color: '#666',
     fontSize: 13,
@@ -1271,135 +1087,6 @@ const styles = StyleSheet.create({
   loadingBox: {
     alignItems: 'center',
     paddingVertical: 20,
-  },
-  addressList: {
-    gap: 8,
-  },
-  addressCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1.5,
-    borderColor: '#e3e8dd',
-    backgroundColor: '#f9faf7',
-  },
-  addressCardActive: {
-    borderColor: '#2E7D32',
-    backgroundColor: '#eaf6df',
-  },
-  addressCardText: {
-    flex: 1,
-    color: '#333',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#bbb',
-    flexShrink: 0,
-  },
-  radioActive: {
-    borderColor: '#2E7D32',
-    backgroundColor: '#2E7D32',
-  },
-  inlineForm: {
-    gap: 12,
-    marginTop: 6,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  chip: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#ededed',
-  },
-  chipActive: {
-    backgroundColor: '#2E7D32',
-    borderColor: '#2E7D32',
-  },
-  chipText: {
-    color: '#666',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  chipTextActive: {
-    color: '#ffffff',
-  },
-  inlineFormActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  cancelBtn: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  cancelBtnText: {
-    color: '#888',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  saveAddressBtn: {
-    flex: 1,
-    backgroundColor: '#2E7D32',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-
-  /* Método de pago */
-  paymentCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: '#e3e8dd',
-    backgroundColor: '#f9faf7',
-  },
-  paymentCardActive: {
-    borderColor: '#2E7D32',
-    backgroundColor: '#eaf6df',
-  },
-  paymentEmoji: {
-    fontSize: 24,
-  },
-  paymentTextWrap: {
-    flex: 1,
-    gap: 2,
-  },
-  paymentTitle: {
-    color: '#1a2e1a',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  paymentSubtitle: {
-    color: '#2E7D32',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  paymentDesc: {
-    color: '#888',
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 2,
   },
 });
 

@@ -17,6 +17,8 @@ import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAppPreferences } from '@/context/app-preferences';
+import { BrandLogo } from '@/components/branding/brand-logo';
+import { HeroBackground } from '@/components/branding/hero-background';
 
 const COLORS = {
   primaryGreen: '#2E7D32',
@@ -254,10 +256,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}>
 
         {/* Hero de bienvenida: ocupa toda la pantalla al abrir la app */}
-        <LinearGradient
-          colors={[COLORS.primaryGreen, COLORS.deepGreen]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+        <HeroBackground
           style={[
             styles.hero,
             { minHeight: height, paddingTop: insets.top + 20, paddingBottom: insets.bottom + 56 },
@@ -273,9 +272,9 @@ export default function HomeScreen() {
               <Text style={styles.eyebrowText}>{t('heroEyebrow')}</Text>
             </Animated.View>
 
-            <Animated.Text entering={FadeInDown.duration(600).delay(120)} style={styles.brand}>
-              Balancea
-            </Animated.Text>
+            <Animated.View entering={FadeInDown.duration(600).delay(120)} style={styles.brandLogoWrap}>
+              <BrandLogo variant="white" width={190} />
+            </Animated.View>
             <Animated.Text entering={FadeInDown.duration(600).delay(200)} style={styles.tagline}>
               {t('heroTagline')}
             </Animated.Text>
@@ -297,7 +296,7 @@ export default function HomeScreen() {
               <Text style={styles.scrollHintChevron}>⌄</Text>
             </Animated.View>
           </View>
-        </LinearGradient>
+        </HeroBackground>
 
         <View style={styles.content}>
           {/* Tarjeta flotante de beneficios */}
@@ -432,7 +431,7 @@ export default function HomeScreen() {
 
           {/* Pie de página */}
           <Animated.View entering={FadeIn.duration(500).delay(460)} style={styles.footerWrap}>
-            <Text style={[styles.footerBrand, isDark && darkStyles.cardTitle]}>Balancea</Text>
+            <BrandLogo variant="color" width={130} />
             <Text style={styles.footerTagline}>{t('taglineFull')}</Text>
             <View style={styles.footerDivider} />
             <Text style={styles.footerText}>
@@ -561,13 +560,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1,
   },
-  brand: {
-    fontSize: 38,
-    fontWeight: '800',
-    color: COLORS.white,
-    letterSpacing: -0.8,
+  brandLogoWrap: {
+    alignItems: 'center',
     marginBottom: 12,
-    textAlign: 'center',
   },
   tagline: {
     fontSize: 15,
@@ -1074,11 +1069,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingTop: 8,
-  },
-  footerBrand: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: COLORS.textDark,
   },
   footerTagline: {
     fontSize: 13,

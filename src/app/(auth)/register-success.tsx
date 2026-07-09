@@ -1,9 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAppPreferences } from '@/context/app-preferences';
+import { BrandLogo } from '@/components/branding/brand-logo';
+import { HeroBackground } from '@/components/branding/hero-background';
+
+const OVERLAY_COLORS: [string, string] = ['rgba(93,212,93,0.88)', 'rgba(42,110,42,0.93)'];
 
 export default function RegisterSuccessScreen() {
   const { t } = useAppPreferences();
@@ -18,11 +22,15 @@ export default function RegisterSuccessScreen() {
   }, []);
 
   return (
-    <LinearGradient colors={['#5dd45d', '#2a6e2a']} style={styles.gradient}>
+    <HeroBackground overlayColors={OVERLAY_COLORS} style={styles.gradient}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
+          <Animated.View style={{ opacity }}>
+            <BrandLogo variant="white" width={130} />
+          </Animated.View>
+
           <Animated.View style={[styles.iconWrap, { transform: [{ scale }], opacity }]}>
-            <Text style={styles.checkmark}>✓</Text>
+            <Ionicons name="checkmark" size={52} color="#2a6e2a" />
           </Animated.View>
 
           <Animated.View style={{ opacity }}>
@@ -39,7 +47,7 @@ export default function RegisterSuccessScreen() {
           </Animated.View>
         </View>
       </SafeAreaView>
-    </LinearGradient>
+    </HeroBackground>
   );
 }
 
@@ -65,12 +73,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 8,
-  },
-  checkmark: {
-    fontSize: 52,
-    color: '#2a6e2a',
-    fontWeight: '700',
-    lineHeight: 60,
   },
   title: {
     color: '#ffffff',

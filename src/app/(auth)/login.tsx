@@ -11,10 +11,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { auth, ROLE_ADMIN, setToken, setUser } from '@/services/api';
 import { useAppPreferences } from '@/context/app-preferences';
+import { BrandLogo } from '@/components/branding/brand-logo';
+import { HeroBackground } from '@/components/branding/hero-background';
 
 export default function LoginScreen() {
   const { isDark, t } = useAppPreferences();
@@ -32,17 +33,13 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
 
-          {/* Encabezado en degradado */}
-          <LinearGradient
-            colors={['#4EC920', '#1B5E20']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.header}>
+          {/* Encabezado con fondo de marca */}
+          <HeroBackground style={styles.header}>
             <View pointerEvents="none" style={styles.headerBlob} />
 
-            <Text style={styles.title}>Balancea</Text>
+            <BrandLogo variant="white" width={150} style={styles.headerLogo} />
             <Text style={styles.subtitle}>{t('loginSubtitle')}</Text>
-          </LinearGradient>
+          </HeroBackground>
 
           <View style={styles.content}>
             <View style={[styles.floatingCard, isDark && darkStyles.card]}>
@@ -156,11 +153,7 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  title: {
-    color: '#ffffff',
-    fontSize: 34,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+  headerLogo: {
     marginBottom: 10,
   },
   subtitle: {

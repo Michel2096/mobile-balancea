@@ -1,76 +1,34 @@
-import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Linking,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Asset } from 'expo-asset';
-import * as Sharing from 'expo-sharing';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAppPreferences } from '@/context/app-preferences';
 
-const OFFERINGS = [
-  { titleKey: 'offer1Title', descKey: 'offer1Desc' },
-  { titleKey: 'offer2Title', descKey: 'offer2Desc' },
-  { titleKey: 'offer3Title', descKey: 'offer3Desc' },
-  { titleKey: 'offer4Title', descKey: 'offer4Desc' },
+type IconVariant = 'cross' | 'dots' | 'capsule' | 'target' | 'diamond';
+
+const ESENCIA = [
+  { key: 'pasion', titleKey: 'esencia1Title', descKey: 'esencia1Desc', icon: 'cross' as IconVariant, color: '#2E7D32', bg: '#E8F5E9' },
+  { key: 'compromiso', titleKey: 'esencia2Title', descKey: 'esencia2Desc', icon: 'dots' as IconVariant, color: '#1565C0', bg: '#E3F2FD' },
+  { key: 'innovacion', titleKey: 'esencia3Title', descKey: 'esencia3Desc', icon: 'capsule' as IconVariant, color: '#E8622C', bg: '#FFF3E0' },
+  { key: 'excelencia', titleKey: 'esencia4Title', descKey: 'esencia4Desc', icon: 'target' as IconVariant, color: '#7B1FA2', bg: '#EDE7F6' },
 ];
 
-const VALOR_KEYS = [
-  'valorSaludIntegral',
-  'valorRespaldoProfesional',
-  'valorCompromiso',
-  'valorAccesibilidad',
-  'valorInnovacion',
-  'valorEmpatia',
-  'valorRespeto',
-  'valorDisciplina',
+const VALORES = [
+  { key: 'calidad', labelKey: 'valorCalidad', icon: 'target' as IconVariant, color: '#2E7D32', bg: '#E8F5E9' },
+  { key: 'integridad', labelKey: 'valorIntegridad', icon: 'diamond' as IconVariant, color: '#1565C0', bg: '#E3F2FD' },
+  { key: 'compromiso', labelKey: 'valorCompromiso', icon: 'dots' as IconVariant, color: '#E8622C', bg: '#FFF3E0' },
+  { key: 'innovacion', labelKey: 'valorInnovacion', icon: 'capsule' as IconVariant, color: '#7B1FA2', bg: '#EDE7F6' },
+  { key: 'respeto', labelKey: 'valorRespeto', icon: 'cross' as IconVariant, color: '#00695C', bg: '#E0F2F1' },
 ];
 
-const DOCUMENTOS = [
-  {
-    key: 'canva',
-    title: 'Canva Balancea',
-    desc: 'Presentación y diseño de nuestra marca',
-    asset: require('@/pdfs/canva-diet-lettuce.pdf'),
-  },
-  {
-    key: 'carta-usuario',
-    title: 'Carta del Usuario',
-    desc: 'Términos y condiciones para usuarios',
-    asset: require('@/pdfs/carta-usuario.pdf'),
-  },
-  {
-    key: 'balance',
-    title: 'Balance Balancea',
-    desc: 'Presentación y diseño de nuestra marca',
-    asset: require('@/pdfs/balance-diet-lettuce.pdf'),
-  },
-  {
-    key: 'foda',
-    title: 'Foda Balancea',
-    desc: 'Presentación y diseño de nuestra marca',
-    asset: require('@/pdfs/foda-diet-lettuce-completo.pdf'),
-  },
-  {
-    key: 'madurez',
-    title: 'Carta de Madurez Balancea',
-    desc: 'Próximamente disponible',
-    asset: null,
-  },
-  {
-    key: 'ficha',
-    title: 'Ficha Técnica Balancea',
-    desc: 'Presentación y diseño de nuestra marca',
-    asset: require('@/pdfs/ficha-tecnica-diet-lettuce.pdf'),
-  },
+const METAS = ['meta1', 'meta2', 'meta3'];
+
+const STATS = [
+  { key: 'clientes', valueKey: 'statClientesValue', labelKey: 'statClientesLabel', descKey: 'statClientesDesc' },
+  { key: 'productos', valueKey: 'statProductosValue', labelKey: 'statProductosLabel', descKey: 'statProductosDesc' },
+  { key: 'satisfaccion', valueKey: 'statSatisfaccionValue', labelKey: 'statSatisfaccionLabel', descKey: 'statSatisfaccionDesc' },
+  { key: 'calidad', valueKey: 'statCalidadValue', labelKey: 'statCalidadLabel', descKey: 'statCalidadDesc' },
 ];
 
 const EQUIPO = [
@@ -80,32 +38,44 @@ const EQUIPO = [
   { key: 'ma', nombre: 'Lopez Villar Miguel Angel', telefono: '+52 7226165733' },
 ];
 
-async function openDocument(asset: number, dialogTitle: string) {
-  const file = Asset.fromModule(asset);
-  await file.downloadAsync();
-  if (!file.localUri) return;
-
-  const canShare = await Sharing.isAvailableAsync();
-  if (canShare) {
-    await Sharing.shareAsync(file.localUri, { mimeType: 'application/pdf', dialogTitle });
-  } else {
-    await Linking.openURL(file.localUri);
+function PillarIcon({ variant, color }: { variant: IconVariant; color: string }) {
+  switch (variant) {
+    case 'cross':
+      return (
+        <View style={styles.icCrossWrap}>
+          <View style={[styles.icCrossV, { backgroundColor: color }]} />
+          <View style={[styles.icCrossH, { backgroundColor: color }]} />
+        </View>
+      );
+    case 'dots':
+      return (
+        <View style={styles.icDotsWrap}>
+          <View style={[styles.icDot, styles.icDotTop, { backgroundColor: color }]} />
+          <View style={[styles.icDot, styles.icDotLeft, { backgroundColor: color }]} />
+          <View style={[styles.icDot, styles.icDotRight, { backgroundColor: color }]} />
+        </View>
+      );
+    case 'capsule':
+      return (
+        <View style={styles.icCapsuleWrap}>
+          <View style={[styles.icCapsuleHalf, { backgroundColor: color }]} />
+          <View style={[styles.icCapsuleHalf, { backgroundColor: color, opacity: 0.4 }]} />
+        </View>
+      );
+    case 'target':
+      return (
+        <View style={styles.icTargetWrap}>
+          <View style={[styles.icTargetRing, { borderColor: color }]} />
+          <View style={[styles.icTargetDot, { backgroundColor: color }]} />
+        </View>
+      );
+    case 'diamond':
+      return <View style={[styles.icDiamond, { backgroundColor: color }]} />;
   }
 }
 
 export default function SobreNosotrosScreen() {
   const { isDark, t } = useAppPreferences();
-  const [loadingDoc, setLoadingDoc] = useState<string | null>(null);
-
-  async function handleDocPress(key: string, asset: number, title: string) {
-    if (loadingDoc) return;
-    setLoadingDoc(key);
-    try {
-      await openDocument(asset, title);
-    } finally {
-      setLoadingDoc(null);
-    }
-  }
 
   return (
     <SafeAreaView style={[styles.safeArea, isDark && darkStyles.safeArea]}>
@@ -120,6 +90,7 @@ export default function SobreNosotrosScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.header}>
           <View pointerEvents="none" style={styles.headerBlob} />
+          <View pointerEvents="none" style={styles.headerBlobSmall} />
 
           <View style={styles.headerTopRow}>
             <Pressable
@@ -137,19 +108,31 @@ export default function SobreNosotrosScreen() {
             </View>
           </View>
 
-          <Text style={styles.title}>{t('menuNosotros')}</Text>
-          <Text style={styles.subtitle}>{t('aboutSubtitle')}</Text>
+          <Text style={styles.eyebrow}>{t('menuNosotros').toUpperCase()}</Text>
+          <Text style={styles.title}>{t('aboutSubtitle')}</Text>
+          <Text style={styles.heroText}>{t('aboutIntro')}</Text>
         </LinearGradient>
 
         <View style={styles.content}>
 
-          {/* Quienes somos, como tarjeta flotante */}
-          <View style={[styles.floatingCard, isDark && darkStyles.card]}>
-            <View style={styles.cardHeader}>
-              <View style={styles.cardAccentBar} />
-              <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>Balancea</Text>
-            </View>
-            <Text style={[styles.cardText, isDark && darkStyles.cardText]}>{t('aboutIntro')}</Text>
+          {/* Nuestra Esencia */}
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionTitle, isDark && darkStyles.cardTitle]}>
+              {t('esenciaTitle')}
+            </Text>
+          </View>
+          <View style={styles.essenceGrid}>
+            {ESENCIA.map((item) => (
+              <View key={item.key} style={[styles.essenceCard, isDark && darkStyles.card]}>
+                <View style={[styles.essenceIconBubble, { backgroundColor: item.bg }]}>
+                  <PillarIcon variant={item.icon} color={item.color} />
+                </View>
+                <Text style={[styles.essenceTitle, isDark && darkStyles.cardTitle]}>
+                  {t(item.titleKey)}
+                </Text>
+                <Text style={styles.essenceDesc}>{t(item.descKey)}</Text>
+              </View>
+            ))}
           </View>
 
           {/* Mision */}
@@ -183,9 +166,14 @@ export default function SobreNosotrosScreen() {
               </Text>
             </View>
             <View style={styles.valoresGrid}>
-              {VALOR_KEYS.map((key) => (
-                <View key={key} style={styles.valorChip}>
-                  <Text style={styles.valorChipText}>{t(key)}</Text>
+              {VALORES.map((valor) => (
+                <View key={valor.key} style={styles.valorItem}>
+                  <View style={[styles.valorIconBubble, { backgroundColor: valor.bg }]}>
+                    <PillarIcon variant={valor.icon} color={valor.color} />
+                  </View>
+                  <Text style={[styles.valorLabel, isDark && darkStyles.cardTitle]}>
+                    {t(valor.labelKey)}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -204,102 +192,44 @@ export default function SobreNosotrosScreen() {
             </Text>
           </View>
 
-          {/* Meta */}
+          {/* Metas */}
           <View style={[styles.card, isDark && darkStyles.card]}>
             <View style={styles.cardHeader}>
               <View style={styles.cardAccentBar} />
               <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
-                {t('metaTitle')}
+                {t('metasTitle')}
               </Text>
             </View>
-            <Text style={[styles.cardText, isDark && darkStyles.cardText]}>{t('metaText')}</Text>
-          </View>
-
-          {/* Que ofrecemos */}
-          <View style={[styles.card, isDark && darkStyles.card]}>
-            <View style={styles.cardHeader}>
-              <View style={styles.cardAccentBar} />
-              <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
-                {t('ofrecemosTitle')}
-              </Text>
-            </View>
-            <View style={styles.offeringsList}>
-              {OFFERINGS.map((o, i) => (
-                <View key={i} style={styles.offeringItem}>
-                  <View style={styles.offeringBullet}>
-                    <Text style={styles.offeringBulletText}>{i + 1}</Text>
+            <View style={styles.metasList}>
+              {METAS.map((key) => (
+                <View key={key} style={styles.metaRow}>
+                  <View style={styles.metaCheck}>
+                    <Ionicons name="checkmark" size={13} color="#2E7D32" />
                   </View>
-                  <View style={styles.offeringContent}>
-                    <Text style={[styles.offeringTitle, isDark && darkStyles.cardTitle]}>
-                      {t(o.titleKey)}
-                    </Text>
-                    <Text style={styles.offeringDesc}>{t(o.descKey)}</Text>
-                  </View>
+                  <Text style={[styles.metaText, isDark && darkStyles.cardText]}>{t(key)}</Text>
                 </View>
               ))}
             </View>
           </View>
 
-          {/* Documentos importantes */}
-          <View style={[styles.card, isDark && darkStyles.card]}>
-            <View style={styles.cardHeader}>
-              <View style={styles.cardAccentBar} />
-              <Text style={[styles.cardTitle, isDark && darkStyles.cardTitle]}>
-                {t('documentosTitle')}
-              </Text>
-            </View>
-            <View style={styles.docsList}>
-              {DOCUMENTOS.map((doc, i) => {
-                const isLoading = loadingDoc === doc.key;
-                const disabled = !doc.asset || isLoading;
-                return (
-                  <View
-                    key={doc.key}
-                    style={[styles.docRow, i < DOCUMENTOS.length - 1 && styles.docRowDivider]}>
-                    <View style={styles.docTextWrap}>
-                      <Text style={[styles.docTitle, isDark && darkStyles.cardTitle]}>
-                        {doc.title}
-                      </Text>
-                      <Text style={styles.docDesc}>{doc.desc}</Text>
-                    </View>
-                    {isLoading ? (
-                      <ActivityIndicator size="small" color="#2E7D32" />
-                    ) : (
-                      <View style={styles.docActions}>
-                        <Pressable
-                          disabled={disabled}
-                          onPress={() =>
-                            handleDocPress(doc.key, doc.asset, `${t('docVer')} ${doc.title}`)
-                          }
-                          style={({ pressed }) => [
-                            styles.docTag,
-                            !doc.asset && styles.docTagDisabled,
-                            pressed && styles.pressed,
-                          ]}>
-                          <Text style={[styles.docTagText, !doc.asset && styles.docTagTextDisabled]}>
-                            {t('docVer')}
-                          </Text>
-                        </Pressable>
-                        <Pressable
-                          disabled={disabled}
-                          onPress={() =>
-                            handleDocPress(doc.key, doc.asset, `${t('docDescargar')} ${doc.title}`)
-                          }
-                          style={({ pressed }) => [
-                            styles.docTag,
-                            !doc.asset && styles.docTagDisabled,
-                            pressed && styles.pressed,
-                          ]}>
-                          <Text style={[styles.docTagText, !doc.asset && styles.docTagTextDisabled]}>
-                            {t('docDescargar')}
-                          </Text>
-                        </Pressable>
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
+          {/* Balancea en numeros */}
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionTitle, isDark && darkStyles.cardTitle]}>
+              {t('statsSectionTitle')}
+            </Text>
+          </View>
+          <View style={styles.statsGrid}>
+            {STATS.map((stat) => (
+              <View key={stat.key} style={[styles.statCard, isDark && darkStyles.card]}>
+                <Text style={[styles.statValue, isDark && darkStyles.cardTitle]} numberOfLines={1}>
+                  {t(stat.valueKey)}
+                </Text>
+                <Text style={[styles.statLabel, isDark && darkStyles.cardTitle]}>
+                  {t(stat.labelKey)}
+                </Text>
+                <Text style={styles.statDesc}>{t(stat.descKey)}</Text>
+              </View>
+            ))}
           </View>
 
           {/* Contacto */}
@@ -368,7 +298,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 56,
+    paddingBottom: 40,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
     overflow: 'hidden',
@@ -382,11 +312,20 @@ const styles = StyleSheet.create({
     borderRadius: 90,
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
+  headerBlobSmall: {
+    position: 'absolute',
+    bottom: -30,
+    left: -40,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
   headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 22,
   },
   backBtn: {
     backgroundColor: 'rgba(255,255,255,0.16)',
@@ -414,38 +353,42 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
   },
+  eyebrow: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 2,
+    marginBottom: 6,
+  },
   title: {
     color: '#ffffff',
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: '800',
-    letterSpacing: -0.5,
+    letterSpacing: -0.6,
   },
-  subtitle: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 13,
-    marginTop: 6,
-    fontWeight: '500',
+  heroText: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 14,
   },
 
   /* Contenido */
   content: {
     paddingHorizontal: 20,
     gap: 14,
+    marginTop: 4,
   },
-  floatingCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 20,
-    gap: 12,
-    marginTop: -40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 6,
+  sectionHeaderWrap: {
+    marginTop: 6,
+  },
+  sectionTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#1a2e1a',
   },
 
-  /* Card */
+  /* Card genérica */
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 18,
@@ -481,117 +424,213 @@ const styles = StyleSheet.create({
     color: '#555',
   },
 
-  /* Offerings */
-  offeringsList: {
-    gap: 14,
-  },
-  offeringItem: {
+  /* Nuestra esencia */
+  essenceGrid: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
+    flexWrap: 'wrap',
+    gap: 12,
   },
-  offeringBullet: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#4EC920',
+  essenceCard: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 16,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#ebebeb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  essenceIconBubble: {
+    width: 44,
+    height: 44,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
-    marginTop: 1,
+    marginBottom: 2,
   },
-  offeringBulletText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  offeringContent: {
-    flex: 1,
-    gap: 3,
-  },
-  offeringTitle: {
+  essenceTitle: {
     fontSize: 14,
     fontWeight: '700',
     color: '#1a2e1a',
+    lineHeight: 18,
   },
-  offeringDesc: {
-    fontSize: 13,
-    color: '#777',
-    lineHeight: 19,
+  essenceDesc: {
+    fontSize: 12.5,
+    color: '#888',
+    lineHeight: 18,
   },
 
   /* Valores */
   valoresGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 14,
+    justifyContent: 'flex-start',
+  },
+  valorItem: {
+    width: '28%',
+    alignItems: 'center',
     gap: 8,
   },
-  valorChip: {
-    backgroundColor: '#f0f9e8',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: '#d4edbc',
-  },
-  valorChipText: {
-    color: '#2E7D32',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  /* Documentos */
-  docsList: {
-    gap: 0,
-  },
-  docRow: {
-    flexDirection: 'row',
+  valorIconBubble: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    paddingVertical: 14,
+    justifyContent: 'center',
   },
-  docRowDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  docTextWrap: {
-    flex: 1,
-  },
-  docTitle: {
-    fontSize: 14,
+  valorLabel: {
+    fontSize: 12,
     fontWeight: '700',
     color: '#1a2e1a',
+    textAlign: 'center',
   },
-  docDesc: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 2,
-    lineHeight: 17,
+
+  /* Metas */
+  metasList: {
+    gap: 12,
   },
-  docActions: {
+  metaRow: {
     flexDirection: 'row',
-    gap: 6,
+    alignItems: 'center',
+    gap: 12,
+  },
+  metaCheck: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#E8F5E9',
+    alignItems: 'center',
+    justifyContent: 'center',
     flexShrink: 0,
   },
-  docTag: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-  },
-  docTagText: {
+  metaText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
     color: '#555',
-    fontSize: 11,
+  },
+
+  /* Stats */
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  statCard: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#ebebeb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#2E7D32',
+  },
+  statLabel: {
+    fontSize: 13,
     fontWeight: '700',
+    color: '#1a2e1a',
+    marginTop: 4,
   },
-  docTagDisabled: {
-    opacity: 0.5,
+  statDesc: {
+    fontSize: 11.5,
+    color: '#888',
+    marginTop: 3,
+    lineHeight: 16,
   },
-  docTagTextDisabled: {
-    color: '#aaa',
+
+  /* Iconos compartidos */
+  icCrossWrap: {
+    width: 20,
+    height: 20,
+  },
+  icCrossV: {
+    position: 'absolute',
+    left: 8,
+    top: 0,
+    width: 4,
+    height: 20,
+    borderRadius: 2,
+  },
+  icCrossH: {
+    position: 'absolute',
+    left: 0,
+    top: 8,
+    width: 20,
+    height: 4,
+    borderRadius: 2,
+  },
+  icDotsWrap: {
+    width: 20,
+    height: 18,
+  },
+  icDot: {
+    position: 'absolute',
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  icDotTop: {
+    top: 0,
+    left: 6.5,
+  },
+  icDotLeft: {
+    bottom: 0,
+    left: 0,
+  },
+  icDotRight: {
+    bottom: 0,
+    right: 0,
+  },
+  icCapsuleWrap: {
+    flexDirection: 'row',
+    width: 20,
+    height: 11,
+    borderRadius: 5.5,
+    overflow: 'hidden',
+    transform: [{ rotate: '-30deg' }],
+  },
+  icCapsuleHalf: {
+    flex: 1,
+  },
+  icTargetWrap: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  icTargetRing: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2.5,
+  },
+  icTargetDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  icDiamond: {
+    width: 14,
+    height: 14,
+    transform: [{ rotate: '45deg' }],
+    borderRadius: 2,
   },
 
   /* Contact */

@@ -35,7 +35,14 @@
           }
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Permite que Balancea use el micrófono para el asistente de voz.",
+          "speechRecognitionPermission": "Permite que Balancea reconozca tu voz para el asistente."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

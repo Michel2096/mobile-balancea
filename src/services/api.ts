@@ -544,4 +544,52 @@ export const ordenesApi = {
 
   getEstadisticas: () =>
     request<{ success: boolean; stats: Record<string, unknown> }>('/ordenes/estadisticas'),
+
+  getByTelefono: (telefono: string) =>
+    request<Orden[]>(`/ordenes/usuario/${encodeURIComponent(telefono)}`),
+};
+
+export type Notificacion = {
+  id: number | string;
+  user_id: number | string;
+  user_type: 'cliente' | 'admin';
+  tipo: string;
+  titulo: string;
+  mensaje: string;
+  leida: boolean;
+  metadata?: Record<string, unknown>;
+  orden_id?: number | string | null;
+  fecha_creacion: string;
+  fecha_leida?: string | null;
+  hace_cuanto?: string;
+};
+
+export type NotificacionesResponse = {
+  notificaciones: Notificacion[];
+  total: number;
+  pagina_actual: number;
+  total_paginas: number;
+};
+
+export type NotificacionesContador = {
+  total_no_leidas: number;
+  notificaciones_recientes: Pick<Notificacion, 'id' | 'titulo' | 'mensaje' | 'tipo' | 'fecha_creacion'>[];
+};
+
+export const notificacionesApi = {
+  getAll: (page = 1, perPage = 20) =>
+    request<NotificacionesResponse>(`/notificaciones/usuario?page=${page}&per_page=${perPage}`),
+
+  getContador: () => request<NotificacionesContador>('/notificaciones/contador'),
+
+  marcarLeida: (id: number | string) =>
+    request<{ msg: string }>(`/notificaciones/${id}/leer`, { method: 'PUT' }),
+
+  marcarTodasLeidas: () =>
+    request<{ msg: string }>('/notificaciones/leer-todas', { method: 'PUT' }),
+
+  eliminar: (id: number | string) =>
+    request<{ msg: string }>(`/notificaciones/${id}`, { method: 'DELETE' }),
+
+  eliminarLeidas: () => request<{ msg: string }>('/notificaciones/leidas', { method: 'DELETE' }),
 };
