@@ -326,21 +326,28 @@ export default function ProfileScreen() {
     }
   }
 
+  async function doDeleteAddress(direccion: Direccion) {
+    try {
+      await direccionesApi.remove(direccion.id);
+      await fetchProfile();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : t('profileAddressError');
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert(t('errorTitle'), msg);
+      }
+    }
+  }
+
   function handleDeleteAddress(direccion: Direccion) {
+    if (Platform.OS === 'web') {
+      if (window.confirm(t('profileConfirmDeleteAddress'))) doDeleteAddress(direccion);
+      return;
+    }
     Alert.alert(t('profileConfirmDeleteAddress'), undefined, [
       { text: t('cancel'), style: 'cancel' },
-      {
-        text: t('profileDelete'),
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await direccionesApi.remove(direccion.id);
-            await fetchProfile();
-          } catch (err: unknown) {
-            Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('profileAddressError'));
-          }
-        },
-      },
+      { text: t('profileDelete'), style: 'destructive', onPress: () => doDeleteAddress(direccion) },
     ]);
   }
 
@@ -372,21 +379,28 @@ export default function ProfileScreen() {
     }
   }
 
+  async function doDeleteCard(tarjeta: Tarjeta) {
+    try {
+      await tarjetasApi.remove(tarjeta.id);
+      await fetchProfile();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : t('profileCardError');
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert(t('errorTitle'), msg);
+      }
+    }
+  }
+
   function handleDeleteCard(tarjeta: Tarjeta) {
+    if (Platform.OS === 'web') {
+      if (window.confirm(t('profileConfirmDeleteCard'))) doDeleteCard(tarjeta);
+      return;
+    }
     Alert.alert(t('profileConfirmDeleteCard'), undefined, [
       { text: t('cancel'), style: 'cancel' },
-      {
-        text: t('profileDelete'),
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await tarjetasApi.remove(tarjeta.id);
-            await fetchProfile();
-          } catch (err: unknown) {
-            Alert.alert(t('errorTitle'), err instanceof Error ? err.message : t('profileCardError'));
-          }
-        },
-      },
+      { text: t('profileDelete'), style: 'destructive', onPress: () => doDeleteCard(tarjeta) },
     ]);
   }
 
