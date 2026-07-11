@@ -23,13 +23,16 @@ import { useAppPreferences } from '@/context/app-preferences';
 import { CheckoutStepper } from '@/components/checkout/CheckoutStepper';
 import { AddressList } from '@/components/checkout/AddressList';
 import { AddressFormModal } from '@/components/checkout/AddressFormModal';
-import { addressTypeInfo } from '@/components/checkout/AddressCard';
+import { AddressCard, addressTypeInfo } from '@/components/checkout/AddressCard';
 import { PaymentMethodCard } from '@/components/checkout/PaymentMethodCard';
 import { OrderSummaryCard } from '@/components/checkout/OrderSummaryCard';
 import { CheckoutNavButtons } from '@/components/checkout/CheckoutNavButtons';
 import { PaymentSuccessBanner } from '@/components/checkout/PaymentSuccessBanner';
+import { ReviewCard } from '@/components/checkout/ReviewCard';
+import { SuccessValidationCard } from '@/components/checkout/SuccessValidationCard';
+import { TrustBadges } from '@/components/checkout/TrustBadges';
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 type MetodoPago = 'efectivo' | 'tarjeta';
 
 type ConfirmedOrder = {
@@ -212,6 +215,10 @@ export default function CarritoScreen() {
     setStep(4);
   }
 
+  function handleContinueToResumen() {
+    setStep(5);
+  }
+
   async function handleConfirmar() {
     if (!user) {
       Alert.alert(t('errorTitle'), t('carritoLoginRequired'));
@@ -263,7 +270,9 @@ export default function CarritoScreen() {
     ? t('informacionPersonalTitle')
     : step === 3
     ? t('checkoutStepDireccion')
-    : t('metodoPagoTitle');
+    : step === 4
+    ? t('metodoPagoTitle')
+    : t('resumenPasoTitle');
 
   const headerSubtitle = confirmedOrder
     ? undefined
@@ -273,6 +282,8 @@ export default function CarritoScreen() {
       : t('carritoHeaderCount', { count })
     : step === 2
     ? t('informacionPersonalSubtitle')
+    : step === 5
+    ? t('resumenPasoSubtitle')
     : undefined;
 
   return (
@@ -320,6 +331,7 @@ export default function CarritoScreen() {
                   t('checkoutStepInformacion'),
                   t('checkoutStepDireccion'),
                   t('checkoutStepPago'),
+                  t('checkoutStepResumen'),
                 ]}
               />
             )}
@@ -539,41 +551,117 @@ export default function CarritoScreen() {
             />
 
             {step === 4 && (
-              <>
-                <View style={[styles.floatingCard, isDark && darkStyles.card]}>
-                  <PaymentMethodCard
-                    icon="cash-outline"
-                    title={t('pagoEfectivoTitle')}
-                    subtitle={t('pagoEfectivoSubtitle')}
-                    description={t('pagoEfectivoDesc')}
-                    active={metodoPago === 'efectivo'}
-                    isDark={isDark}
-                    onSelect={() => setMetodoPago('efectivo')}
-                  />
+              <View style={[styles.floatingCard, isDark && darkStyles.card]}>
+                <PaymentMethodCard
+                  icon="cash-outline"
+                  title={t('pagoEfectivoTitle')}
+                  subtitle={t('pagoEfectivoSubtitle')}
+                  description={t('pagoEfectivoDesc')}
+                  active={metodoPago === 'efectivo'}
+                  isDark={isDark}
+                  onSelect={() => setMetodoPago('efectivo')}
+                />
 
-                  <PaymentMethodCard
-                    icon="card-outline"
-                    title={t('pagoTarjetaTitle')}
-                    subtitle={t('pagoTarjetaSubtitle')}
-                    description={t('pagoTarjetaDesc')}
-                    active={metodoPago === 'tarjeta'}
-                    isDark={isDark}
-                    onSelect={() => setMetodoPago('tarjeta')}
-                  />
+                <PaymentMethodCard
+                  icon="card-outline"
+                  title={t('pagoTarjetaTitle')}
+                  subtitle={t('pagoTarjetaSubtitle')}
+                  description={t('pagoTarjetaDesc')}
+                  active={metodoPago === 'tarjeta'}
+                  isDark={isDark}
+                  onSelect={() => setMetodoPago('tarjeta')}
+                />
 
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>{t('notasAdicionalesLabel')}</Text>
-                    <TextInput
-                      style={[styles.input, styles.textArea, isDark && darkStyles.input]}
-                      value={notas}
-                      onChangeText={setNotas}
-                      placeholder={t('notasAdicionalesPlaceholder')}
-                      placeholderTextColor="#b0c8a0"
-                      multiline
-                    />
-                    <Text style={styles.helperText}>{t('notasEnvioHelper')}</Text>
-                  </View>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.label}>{t('notasAdicionalesLabel')}</Text>
+                  <TextInput
+                    style={[styles.input, styles.textArea, isDark && darkStyles.input]}
+                    value={notas}
+                    onChangeText={setNotas}
+                    placeholder={t('notasAdicionalesPlaceholder')}
+                    placeholderTextColor="#b0c8a0"
+                    multiline
+                  />
+                  <Text style={styles.helperText}>{t('notasEnvioHelper')}</Text>
                 </View>
+
+                <CheckoutNavButtons
+                  onBack={() => setStep(3)}
+                  backLabel={t('prevStep')}
+                  onNext={handleContinueToResumen}
+                  nextLabel={t('continuarConPedido')}
+                />
+              </View>
+            )}
+
+            {step === 5 && (
+              <>
+                <ReviewCard icon="bag-handle-outline" title={t('resumenProductosTitle')} isDark={isDark}>
+                  {items.map((item, idx) => (
+                    <View
+                      key={item.suplementoId}
+                      style={[styles.reviewItemRow, idx < items.length - 1 && styles.itemRowDivider]}>
+                      <View style={styles.itemIconBadge}>
+                        <Text style={styles.itemIconText}>{item.nombre[0]?.toUpperCase() ?? '?'}</Text>
+                      </View>
+                      <View style={styles.itemInfo}>
+                        <Text style={styles.itemName} numberOfLines={1}>{item.nombre}</Text>
+                        <Text style={styles.itemPrice}>
+                          {item.cantidad} × {formatPrecio(item.precio)}
+                        </Text>
+                      </View>
+                      <Text style={styles.reviewItemSubtotal}>{formatPrecio(item.precio * item.cantidad)}</Text>
+                    </View>
+                  ))}
+                </ReviewCard>
+
+                <ReviewCard icon="person-outline" title={t('checkoutContactoTitle')} isDark={isDark}>
+                  <View style={styles.reviewInfoRow}>
+                    <Ionicons name="person-circle-outline" size={16} color="#2E7D32" />
+                    <Text style={[styles.reviewInfoValue, isDark && darkStyles.readonlyText]}>
+                      {user?.nombre ?? '—'}
+                    </Text>
+                  </View>
+                  <View style={styles.reviewInfoRow}>
+                    <Ionicons name="call-outline" size={16} color="#2E7D32" />
+                    <Text style={[styles.reviewInfoValue, isDark && darkStyles.readonlyText]}>
+                      {user?.telefono ?? '—'}
+                    </Text>
+                  </View>
+                </ReviewCard>
+
+                {direccionSeleccionada && (
+                  <ReviewCard icon="location-outline" title={t('direccionEntregaTitle')} isDark={isDark}>
+                    <AddressCard direccion={direccionSeleccionada} isDark={isDark} t={t} />
+                  </ReviewCard>
+                )}
+
+                <ReviewCard icon="wallet-outline" title={t('metodoPagoSeleccionadoTitle')} isDark={isDark}>
+                  <View style={[styles.reviewPaymentBadge, isDark && darkStyles.reviewPaymentBadge]}>
+                    <View style={styles.reviewPaymentIconWrap}>
+                      <Ionicons
+                        name={metodoPago === 'efectivo' ? 'cash-outline' : 'card-outline'}
+                        size={20}
+                        color="#ffffff"
+                      />
+                    </View>
+                    <View style={styles.textWrap}>
+                      <Text style={[styles.reviewPaymentTitle, isDark && darkStyles.cardTitle]}>
+                        {metodoPago === 'efectivo' ? t('pagoEfectivoTitle') : t('pagoTarjetaTitle')}
+                      </Text>
+                      <Text style={styles.reviewPaymentSubtitle}>
+                        {metodoPago === 'efectivo' ? t('pagoEfectivoSubtitle') : t('pagoTarjetaSubtitle')}
+                      </Text>
+                    </View>
+                    <Ionicons name="checkmark-circle" size={20} color="#2E7D32" />
+                  </View>
+                </ReviewCard>
+
+                <SuccessValidationCard
+                  title={t('todoListoTitle')}
+                  description={t('todoListoDesc')}
+                  isDark={isDark}
+                />
 
                 <OrderSummaryCard
                   title={t('resumenPedido')}
@@ -581,37 +669,43 @@ export default function CarritoScreen() {
                   rows={[
                     { key: 'items', label: t('suplementosLabel', { count }), value: formatPrecio(total) },
                     { key: 'envio', label: t('envioLabel'), value: t('envioGratisValor'), emphasis: 'free' },
-                    {
-                      key: 'metodoPago',
-                      label: t('metodoPagoResumenLabel'),
-                      value: metodoPago === 'efectivo' ? t('metodoPagoEfectivoCorto') : t('metodoPagoTarjetaCorto'),
-                    },
                   ]}
-                  addressLine={
-                    direccionSeleccionada
-                      ? {
-                          label: t('direccionEntregaTitle'),
-                          value: `${t(addressTypeInfo(direccionSeleccionada.tipo).labelKey)} · ${formatDireccion(
-                            direccionSeleccionada
-                          )}`,
-                        }
-                      : undefined
-                  }
                   totalLabel={t('totalLabel')}
                   totalValue={formatPrecio(total)}
                   footer={
                     <>
                       <CheckoutNavButtons
-                        onBack={() => setStep(3)}
+                        onBack={() => setStep(4)}
                         backLabel={t('prevStep')}
                         onNext={handleConfirmar}
-                        nextLabel={`${t('finalizarPedidoBtn')} - ${formatPrecio(total)}`}
+                        nextLabel={t('finalizarPedidoBtn')}
                         loading={placing}
                         disabled={placing || !direccionSeleccionada}
                       />
                       <Text style={styles.disclaimerText}>{t('terminosDisclaimer')}</Text>
                     </>
                   }
+                />
+
+                <TrustBadges
+                  isDark={isDark}
+                  badges={[
+                    {
+                      icon: 'lock-closed-outline',
+                      title: t('confianzaCompraSeguraTitle'),
+                      description: t('confianzaCompraSeguraDesc'),
+                    },
+                    {
+                      icon: 'shield-checkmark-outline',
+                      title: t('confianzaPagoProtegidoTitle'),
+                      description: t('confianzaPagoProtegidoDesc'),
+                    },
+                    {
+                      icon: 'ribbon-outline',
+                      title: t('confianzaSatisfaccionTitle'),
+                      description: t('confianzaSatisfaccionDesc'),
+                    },
+                  ]}
                 />
               </>
             )}
@@ -999,6 +1093,62 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  /* Paso 5: Resumen */
+  reviewItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+  },
+  reviewItemSubtotal: {
+    color: '#1B5E20',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  reviewInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  reviewInfoValue: {
+    color: '#1a2e1a',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  reviewPaymentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#eaf6df',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#d4edbc',
+  },
+  reviewPaymentIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#2E7D32',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  textWrap: {
+    flex: 1,
+    gap: 1,
+  },
+  reviewPaymentTitle: {
+    color: '#1a2e1a',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  reviewPaymentSubtitle: {
+    color: '#2E7D32',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
   /* Campos genéricos */
   fieldGroup: {
     gap: 7,
@@ -1115,5 +1265,9 @@ const darkStyles = StyleSheet.create({
   },
   readonlyText: {
     color: '#ddd',
+  },
+  reviewPaymentBadge: {
+    backgroundColor: '#20261f',
+    borderColor: '#2a2a2a',
   },
 });
